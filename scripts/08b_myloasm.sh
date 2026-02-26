@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 8b: Myloasm assembly
-# Submit as: sbatch --array=1-66 08b_myloasm.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 8b: Assemble filtered reads with Myloasm.
+# Input: processing/nanofilt/filtered_<sample>.fastq
+# Output: processing/myloasm/<sample>/assembly_primary.fa
+# Run: sbatch --array=1-N scripts/08b_myloasm.sh
+# -----------------------------------------------------------------------------
 INPUT_DIR="/path/to/project/processing/nanofilt"
 OUTPUT_DIR="/path/to/project/processing/myloasm"
 FILELIST="/path/to/project/filelist.txt"

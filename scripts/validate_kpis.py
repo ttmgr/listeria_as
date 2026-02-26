@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+"""
+Validation helper for key report metrics.
+Purpose: quickly confirm expected totals and positivity counts before final review.
+
+Usage:
+  python3 validate_kpis.py <base_dir>
+"""
 
 import sys
 import os

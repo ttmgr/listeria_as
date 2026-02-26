@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 13: Kraken2 on assembled contigs (Flye + mdbg + myloasm)
-# Submit as: sbatch --array=1-66 --dependency=afterok:<FLYE>:<MDBG>:<MYLOASM> 13_kraken2_contigs.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 13: Classify assembled contigs with Kraken2.
+# Input: Flye-polished, metaMDBG, and Myloasm contigs
+# Output: processing/kraken2_contigs/<assembler>/classified_*.txt and report_*.txt
+# Run: sbatch --array=1-N --dependency=afterok:<FLYE>:<MDBG>:<MYLOASM> scripts/13_kraken2_contigs.sh
+# -----------------------------------------------------------------------------
 FLYE_DIR="/path/to/project/processing/racon"
 MDBG_DIR="/path/to/project/processing/mdbg"
 MYLOASM_DIR="/path/to/project/processing/myloasm"

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Listeria read analysis plots.
+Listeria plotting helper.
+Purpose: make quick visual checks of Listeria read enrichment by sample.
+
 Reads listeria_summary.tsv and produces:
   1. Grouped bar chart: AS vs N per barcode (read counts)
   2. Grouped bar chart: AS vs N per barcode (total bases)

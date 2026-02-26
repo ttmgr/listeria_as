@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 6: Extract Listeria reads from Kraken2 output + stats
-# Submit as: sbatch --array=1-66 --dependency=afterok:<KRAKEN_JOB_ID> 06_listeria_extract.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 6: Pull out reads classified as Listeria and summarize them.
+# Input: filtered FASTQ and Kraken2 read classification for each sample
+# Output: Listeria-only FASTQ, read ID list, per-sample summary rows
+# Run: sbatch --array=1-N --dependency=afterok:<KRAKEN_JOB_ID> scripts/06_listeria_extract.sh
+# -----------------------------------------------------------------------------
 INPUT_FASTQ_DIR="/path/to/project/processing/nanofilt"
 KRAKEN_DIR="/path/to/project/processing/kraken2"
 OUTPUT_DIR="/path/to/project/processing/listeria"

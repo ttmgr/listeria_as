@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 11: AMRFinderPlus --plus on reads, Flye contigs, mdbg contigs, myloasm contigs
-# Submit as: sbatch --array=1-66 --dependency=afterok:<SEQKIT>:<FLYE>:<MDBG>:<MYLOASM> 11_amrfinderplus.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 11: Screen reads and contigs for AMR/virulence markers with AMRFinderPlus.
+# Input: FASTA reads plus Flye, metaMDBG, and Myloasm assemblies
+# Output: processing/amrfinder/{reads,flye,mdbg,myloasm}/amrfinder_*.tsv
+# Run: sbatch --array=1-N --dependency=afterok:<SEQKIT>:<FLYE>:<MDBG>:<MYLOASM> scripts/11_amrfinderplus.sh
+# -----------------------------------------------------------------------------
 READS_DIR="/path/to/project/processing/fasta"
 FLYE_DIR="/path/to/project/processing/racon"
 MDBG_DIR="/path/to/project/processing/mdbg"

@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 3: Length filtering with NanoFilt (remove reads < 100 bp)
-# Submit as: sbatch --array=1-66 --dependency=afterok:<JOB2_ID> 03_nanofilt.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 3: Remove short reads (<100 bp) after adapter trimming.
+# Input: processing/porechop/trimmed_<sample>.fastq
+# Output: processing/nanofilt/filtered_<sample>.fastq
+# Run: sbatch --array=1-N --dependency=afterok:<JOB2_ID> scripts/03_nanofilt.sh
+# -----------------------------------------------------------------------------
 INPUT_DIR="/path/to/project/processing/porechop"
 OUTPUT_DIR="/path/to/project/processing/nanofilt"
 FILELIST="/path/to/project/filelist.txt"

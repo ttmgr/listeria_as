@@ -2,11 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 19: Reads-Only QC Report (Reads + Listeria + AMR)
-# Submit as: sbatch 19_reads_report.sh
-# (Ideally after Step 7, 6, 11 are done)
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 19: Build a fast reads-focused report before assembly-heavy steps finish.
+# Input: read metrics, Listeria read summary, and AMR read summary
+# Output: processing/report/reads_report.html
+# Run: sbatch scripts/19_reads_report.sh
+# -----------------------------------------------------------------------------
 WORK_DIR="/path/to/project"
 echo "Generating reads-only report..."
 echo "Start time: $(date)"

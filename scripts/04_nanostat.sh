@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 4: Basic read statistics with NanoStat
-# Submit as: sbatch --array=1-66 04_nanostat.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 4: Calculate per-sample read QC metrics (count, N50, quality, bases).
+# Input: processing/nanofilt/filtered_<sample>.fastq
+# Output: processing/nanostat/nanostat_<sample>.txt
+# Run: sbatch --array=1-N scripts/04_nanostat.sh
+# -----------------------------------------------------------------------------
 INPUT_DIR="/path/to/project/processing/nanofilt"
 OUTPUT_DIR="/path/to/project/processing/nanostat"
 FILELIST="/path/to/project/filelist.txt"

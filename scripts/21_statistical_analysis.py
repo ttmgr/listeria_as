@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Step 21: Statistical Analysis — Extraction & Swab Method Comparison
-Runs on sample_metadata.csv as a dry run, and auto-extends with Scorecard
-when pipeline outputs (comparison_data.csv, enrichment_ratios.csv) exist.
+Step 21 statistical analysis.
+Purpose: run formal tests that compare extraction/swab methods and AS vs N outcomes.
+Starts from sample metadata and extends automatically when comparison tables exist.
 
 Usage:
     python3 21_statistical_analysis.py <base_dir>

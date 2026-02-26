@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 8: metaMDBG assembly
-# Submit as: sbatch --array=1-66 08_metamdbg.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 8: Assemble filtered reads with metaMDBG.
+# Input: processing/nanofilt/filtered_<sample>.fastq
+# Output: processing/mdbg/<sample>/contigs.fasta.gz
+# Run: sbatch --array=1-N scripts/08_metamdbg.sh
+# -----------------------------------------------------------------------------
 INPUT_DIR="/path/to/project/processing/nanofilt"
 OUTPUT_DIR="/path/to/project/processing/mdbg"
 FILELIST="/path/to/project/filelist.txt"

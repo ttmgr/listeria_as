@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 18: Calculate General Assembly Statistics
-# Runs seqkit stats on all Flye and metaMDBG assemblies
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 18: Summarize assembly quality metrics with seqkit stats.
+# Input: assembly FASTA files from Flye, metaMDBG, and Myloasm
+# Output: processing/stats/assembly_stats_{flye,mdbg,myloasm}.tsv
+# Run: sbatch scripts/18_assembly_stats.sh
+# -----------------------------------------------------------------------------
 PROJECT_DIR="/path/to/project"
 MDBG_DIR="${PROJECT_DIR}/processing/mdbg"
 FLYE_DIR="${PROJECT_DIR}/processing/flye"

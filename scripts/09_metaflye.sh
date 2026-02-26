@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 9: metaFlye assembly + minimap2 alignment + racon polishing
-# Submit as: sbatch --array=1-66 09_metaflye.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 9: Assemble with Flye, map reads back, then polish with Racon.
+# Input: processing/nanofilt/filtered_<sample>.fastq
+# Output: processing/racon/polished_<sample>.fasta and sorted BAM alignment
+# Run: sbatch --array=1-N scripts/09_metaflye.sh
+# -----------------------------------------------------------------------------
 INPUT_DIR="/path/to/project/processing/nanofilt"
 FLYE_DIR="/path/to/project/processing/flye"
 MINIMAP_DIR="/path/to/project/processing/minimap2"

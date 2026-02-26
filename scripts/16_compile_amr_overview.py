@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Step 16: Compile AMRFinderPlus results into overview tables.
+Step 16 companion script: compile AMRFinderPlus outputs for reporting.
+Purpose: create easy-to-read AMR summary tables from per-sample TSV files.
 
 Outputs:
   amr_reads_overview.csv    — Barcode, Type, Gene Symbol, Class, Subclass, Read Count

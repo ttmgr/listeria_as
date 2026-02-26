@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Plot Listeria results
-# Submit as: sbatch 12_plot_listeria.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Optional plot step: make quick Listeria read-count and base-count figures.
+# Input: processing/listeria/listeria_summary.tsv
+# Output: processing/listeria/plots/*.png and *.pdf
+# Run: sbatch scripts/12_plot_listeria.sh
+# -----------------------------------------------------------------------------
 WORK_DIR="/path/to/project"
 INPUT="${WORK_DIR}/processing/listeria/listeria_summary.tsv"
 OUTPUT="${WORK_DIR}/processing/listeria/plots"

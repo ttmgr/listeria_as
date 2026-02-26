@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 1: BAM → FASTQ conversion using samtools
-# Submit as: sbatch --array=1-66 01_samtools_bam2fastq.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 1: Convert Nanopore BAM files to FASTQ.
+# Input: BAM file chosen by SLURM array index from filelist.txt
+# Output: processing/samtools/<sample>.fastq
+# Run: sbatch --array=1-N scripts/01_samtools_bam2fastq.sh
+# -----------------------------------------------------------------------------
 INPUT_DIR="/path/to/BAM_files"
 OUTPUT_DIR="/path/to/project/processing/samtools"
 FILELIST="/path/to/project/filelist.txt"

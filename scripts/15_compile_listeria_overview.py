@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Comprehensive Listeria analysis overview.
-Combines read-level and contig-level Listeria data into one CSV + plots.
+Step 15 companion script: create one combined Listeria overview.
+Purpose: merge read-level and contig-level Listeria results into tables and figures.
 
 Usage:
     python3 15_compile_listeria_overview.py <base_dir>
@@ -10,6 +10,9 @@ Expects:
     <base_dir>/processing/listeria/listeria_summary.tsv
     <base_dir>/processing/listeria/listeria_contigs_summary.tsv
     <base_dir>/processing/nanostat/barcode*  (for total read counts)
+
+Main output:
+    <base_dir>/processing/listeria/overview/listeria_overview.csv
 """
 
 import sys

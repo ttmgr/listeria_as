@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Step 17: Generate comprehensive HTML report for Nanopore pipeline.
+Step 17 report builder (v2, default).
+Purpose: generate the main HTML report used at the end of the pipeline.
 
 Includes:
   - Methods quick sheet (tools, versions, flags, order)
@@ -11,7 +12,7 @@ Includes:
   - Embedded plots
 
 Usage:
-    python3 17_generate_report.py <base_dir>
+    python3 17_generate_report_v2.py <base_dir>
 """
 
 import sys

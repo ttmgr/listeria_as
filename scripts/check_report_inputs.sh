@@ -1,5 +1,6 @@
 #!/bin/bash
-# Check if all required inputs for the report exist and have content
+# Quick preflight check for report inputs.
+# What it does: verifies key summary files exist and are non-empty.
 # Usage: ./check_report_inputs.sh /path/to/project
 BASE_DIR="${1:-.}"
 echo "Checking report inputs in: $BASE_DIR"

@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Step 19: Reads-Only Report (Overview & Methods)
-Generates a lightweight HTML report for read-level analysis only.
-Ideal for quick QC before assembly finishes.
+Step 19 reads-focused report.
+Purpose: create a quick HTML summary of read-level metrics before assembly completes.
 
 Outputs:
   processing/report/reads_report.html
   processing/report/reads_methods.md
+
+Usage:
+  python3 19_reads_report.py <base_dir>
 """
 
 import sys

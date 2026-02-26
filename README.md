@@ -1,147 +1,165 @@
 # Listeria Adaptive Sampling Pipeline
 
-Welcome! This repository contains the complete pipeline for processing Nanopore sequencing data used in the **Listeria Adaptive Sampling** project. 
+This repository contains a full analysis workflow for Oxford Nanopore sequencing data, focused on *Listeria* detection and characterization from mixed samples.
 
-This guide is designed to be **idiot-proof**. It explains what every script does, exactly what commands to run, what the flags mean, and how to run it whether you are using a high-performance cluster (SLURM) or running it locally on your own machine.
+The scripts are written for HPC batch execution (SLURM), but you can also run them manually for small tests.
 
----
+## Why this matters for food safety
 
-## 📖 Overview of the Pipeline
+*Listeria monocytogenes* is a foodborne pathogen that can survive in food-processing environments and can cause severe disease, especially in pregnant people, older adults, and immunocompromised patients. Rapidly detecting *Listeria* signal in sequencing data helps food safety teams act faster during contamination checks and outbreak investigations.
 
-The pipeline takes raw sequence data (BAM format from the sequencer) and processes it through 5 main stages:
-1. **Preprocessing & QC:** Convert BAM to FASTQ, plot quality, filter reads.
-2. **Taxonomic Profiling:** Identify what species are in the samples using Kraken2.
-3. **Target Extraction:** Extract *Listeria* reads from the mixed microbiome.
-4. **Assembly & AMR:** Assemble the long reads into contigs and look for antimicrobial resistance (AMR) genes.
-5. **Reporting & Visualization:** Generate summary CSV tables and publication-ready plots.
+## What adaptive sampling is (Nanopore, plain language)
 
-All scripts are located in the `scripts/` folder.
+Adaptive sampling is a real-time enrichment approach during Nanopore sequencing. As DNA starts passing through a pore, the instrument basecalls the first part of the read, compares it to a target reference, and then decides:
 
----
+- keep sequencing the read if it looks like target DNA
+- eject the read early if it looks off-target
 
-## 🖥️ Running the Pipeline: SLURM vs. Local
+In practice, this can increase sequencing yield for targets of interest (here, *Listeria*) without physically enriching DNA in the wet lab first.
 
-You have two ways to run these scripts:
+## Who this README is for
 
-### 1. Using SLURM (High-Performance Cluster)
-If you are on an HPC cluster (like the one used for the original project), you will submit scripts as "jobs" so the cluster runs them for you in the background. Note: To run the SLURM arrays, you must define the numbers of tasks up to your total barcode count (e.g. `--array=1-66`).
-**Command to submit a script:**
+This guide is written for wet-lab users who may not work with command-line pipelines every day. It is focused on:
+
+- what to edit before first run
+- which command to run
+- what files should appear when things work
+
+## Quick start (recommended path)
+
+1. Clone the repo and enter it.
+2. Edit path variables in scripts (details below).
+3. Confirm tools are available in your conda environment.
+4. Run the orchestrator script:
+
 ```bash
-sbatch scripts/01_samtools_bam2fastq.sh
+bash scripts/submit_pipeline.sh
 ```
 
-### 2. Running Locally (Your own PC/Server)
-If you don't have SLURM, you can simply run the bash scripts directly in your terminal. You will need to remove the `#SBATCH` header lines from the scripts or just ignore them. Run them like this:
+This orchestrator submits and links the full workflow (steps 1 to 20), and skips outputs that already exist.
+
+## Before first run: required edits
+
+Most scripts use placeholder paths like:
+
+- `/path/to/project`
+- `/path/to/BAM_files`
+
+At minimum, update these in:
+
+- `scripts/submit_pipeline.sh`
+- all step scripts you plan to run (for example `scripts/01_samtools_bam2fastq.sh`, `scripts/05_kraken2.sh`, `scripts/17_generate_report.sh`)
+
+The scripts also assume:
+
+- a conda environment named `tim`
+- `conda.sh` at `~/miniconda3/etc/profile.d/conda.sh`
+
+If your environment name or conda location differs, update the first lines of each shell script.
+
+## Required input files
+
+- Raw Nanopore `.bam` files in one directory (set as `BAM_DIR` in `submit_pipeline.sh`)
+- File naming that keeps sample/barcode identity (the scripts derive sample IDs from BAM names)
+
+When `submit_pipeline.sh` runs, it creates `filelist.txt` automatically from `BAM_DIR`.
+
+## Pipeline map (what each script does)
+
+1. `01_samtools_bam2fastq.sh`: BAM to FASTQ
+2. `02_porechop.sh`: adapter trimming
+3. `03_nanofilt.sh`: length filtering (`<100 bp` removed)
+4. `03b_read_lengths.sh`: read-length distributions
+5. `04_nanostat.sh`: QC metrics per sample
+6. `05_kraken2.sh`: taxonomic classification on reads
+7. `06_listeria_extract.sh`: extract *Listeria* reads and per-sample summaries
+8. `07_compile_stats.sh`: compile read and *Listeria* summary tables
+9. `08_metamdbg.sh`, `08b_myloasm.sh`, `09_metaflye.sh`: assembly workflows
+10. `10_seqkit_fq2fa.sh`: FASTQ to FASTA
+11. `11_amrfinderplus.sh`: AMR calls on reads and contigs
+12. `13_kraken2_contigs.sh`: taxonomy on assembled contigs
+13. `14_listeria_contigs.sh`: extract *Listeria* contigs and contig stats
+14. `15_compile_listeria_overview.sh`: integrated *Listeria* overview
+15. `16_compile_amr_overview.sh`: AMR overview tables
+16. `18_assembly_stats.sh`: assembly summary stats
+17. `17_generate_report.sh`: HTML report
+18. `20_comparison_report.sh`: AS vs N comparison report
+
+Optional downstream scripts:
+
+- `19_reads_report.sh`: read-focused quick report
+- `21_statistical_analysis.py`: statistical testing
+- `22_local_plots.py`: local publication-style figure generation
+- `20_export_tables_to_xlsx.py`, `21_kraken2_to_spreadsheets.py`: spreadsheet exports
+
+## Output locations to check first
+
+After a successful run, start here:
+
+- `processing/report/pipeline_report.html`
+- `processing/listeria/overview/listeria_overview.csv`
+- `processing/amrfinder/overview/amr_reads_overview.csv`
+- `processing/amrfinder/overview/amr_contigs_overview.csv`
+- `processing/stats/read_metrics_summary.csv`
+
+## Running on SLURM vs local machine
+
+### SLURM (recommended for full dataset)
+
+Use:
+
 ```bash
+bash scripts/submit_pipeline.sh
+```
+
+Monitor jobs:
+
+```bash
+squeue -u "$USER"
+```
+
+### Local/manual (small tests only)
+
+Some scripts expect SLURM variables. For single-sample tests, set them manually:
+
+```bash
+export SLURM_ARRAY_TASK_ID=1
+export SLURM_CPUS_PER_TASK=4
 bash scripts/01_samtools_bam2fastq.sh
 ```
-*Note: Some tools (like Flye or Kraken2) require a lot of RAM. A laptop might struggle with the assembly steps!*
 
----
+Assembly and Kraken2 steps can require substantial RAM/CPU, so full runs are better on HPC.
 
-## 🚀 Step-by-Step Guide
+## Common issues and fast checks
 
-### Step 1: Convert BAM to FASTQ (`01_samtools_bam2fastq.sh`)
-**What it does:** The sequencer outputs `.bam` files. We need `.fastq.gz` files to work with.
-**The tool used:** `samtools fastq`
-*   `-T '*'` : Keeps all tags from the BAM file (like read lengths and quality scores).
-*   `| gzip > out.fastq.gz` : Compresses the output to save massive amounts of disk space.
+- `No file found for task ID`: check `filelist.txt` and `SLURM_ARRAY_TASK_ID`
+- missing Kraken2 output: verify `KRAKEN2_DB` path
+- empty assembly outputs: low-read samples may trigger fallback dummy files by design
+- report missing sections: run input checker
 
-### Step 2: Quality Control Plots (`02_nanoplot.sh`)
-**What it does:** Generates visual summaries (scatter plots, histograms) of read lengths and qualities.
-**The tool used:** `NanoPlot`
-*   `--summary` : Uses the sequencing summary file generated by the sequencer (much faster than reading the raw fastq files).
-*   `--outdir` : Where to save the plots.
-
-### Step 3: Filtering Reads (`03a_filtlong.sh`)
-**What it does:** Removes very short or very low-quality junk reads.
-**The tool used:** `Filtlong`
-*   `--min_length 100` : Drops any read shorter than 100 base pairs.
-*   `--min_mean_q 10` : Drops any read with an average quality score below 10 (Q10 = 90% accuracy).
-
-### Step 4: Extract Read Lengths (`03b_read_lengths.sh`)
-**What it does:** Extracts just the read ID and length from the filtered files so we can plot them later.
-**The tool used:** `awk` (a built-in Unix text processing tool).
-
-### Step 5: Subsampling (Optional) (`04_rasusa.sh`)
-**What it does:** If some samples have 20 million reads and others have 1 million, it's hard to compare them. This tool randomly subsets the large files down to a specific coverage or read count.
-**The tool used:** `rasusa`
-
-### Step 6: Taxonomic Classification (`05_kraken2.sh`)
-**What it does:** Identifies the species of *every single read* using a massive database of known genomes.
-**The tool used:** `kraken2`
-*   `--db` : Points to the reference database.
-*   `--report` : Generates a human-readable text summary of what species were found.
-*   `--output` : The raw, read-by-read classification (warning: massive file!).
-
-### Step 7: Extract *Listeria* Reads (`06_listeria_extract.sh`)
-**What it does:** Searches the massive Kraken2 output specifically for *Listeria* reads, then pulls those specific sequences out of the main FASTQ file so we can analyze them separately.
-**The tools used:** 
-*   `grep -i "listeria"` : Finds the lines mentioning Listeria.
-*   `seqtk subseq` : Uses the list of read IDs to extract the actual DNA sequences from the FASTQ.
-*   `flock` : (File lock) Ensures that if 66 samples are running at once, they don't overwrite each other when writing to the master summary file.
-
-### Step 8: Assembly (`07a_flye`, `07b_metamdbg`, `07c_myloasm`)
-**What it does:** Stitches the short, overlapping reads together into long, contiguous sequences (contigs) — ideally reconstructing whole genomes.
-**The tools used:** We use three different assemblers to compare results:
-*   **Flye** (`--nano-hq`, `--meta`) : Designed for high-quality Nanopore metagenomes.
-*   **MetaMDBG** : A newer assembler that uses de Bruijn graphs.
-*   **Myloasm** : Another specialized long-read assembler.
-
-### Step 9: Map Reads Back to Contigs (`08a`, `08b`, `08c`)
-**What it does:** Aligns the original reads back against the newly assembled contigs to see how well the assembly worked.
-**The tool used:** `minimap2`
-*   `-ax map-ont` : Tells Minimap2 we are mapping Oxford Nanopore (ONT) reads.
-
-### Step 10: Find Antimicrobial Resistance (AMR) Genes (`09`, `10`)
-**What it does:** Scans the assembled contigs *and* the raw reads for known antibiotic resistance genes.
-**The tool used:** `amrfinder` (AMRFinderPlus by NCBI).
-*   `-n` : Input is nucleotide sequence (DNA).
-*   `--plus` : Runs the "plus" module (includes virulence factors, not just AMR).
-
-### Step 11: Compile Summaries (`15`, `16`, `17`)
-**What it does:** Groups all the tiny text files and CSVs generated by 66 different samples into master "overview" spreadsheets.
-*   `15_compile_listeria_overview.sh` : Summarizes the Listeria extraction stats.
-*   `16_compile_qc_metrics.sh` : Summarizes read limits and qualities.
-*   `17_generate_report_v2.sh` : Merges everything into a nice `processing/report/` folder.
-
----
-
-## 📊 Step 12: Final Visualization (`22_local_plots.py`)
-
-Once the pipeline finishes on the cluster/server, you download the `processing/report/` folder to your local Mac/Windows machine.
-
-This Python script reads those CSVs and generates beautifully formatted, publication-ready PDF and PNG charts (read lengths, contigs, Listeria enrichment) and interactive HTML reports.
-
-**How to run it:**
 ```bash
-python3 scripts/22_local_plots.py /path/to/the/downloaded/preprocessing_folder
+bash scripts/check_report_inputs.sh /path/to/project
 ```
 
-### Important note on Python dependencies:
-You will need a few libraries installed to run the local plotting script:
-```bash
-pip install pandas numpy matplotlib scipy
-```
+## Minimal software list
 
----
+Core tools used across scripts:
 
-## 📂 Expected Directory Structure
+- samtools
+- porechop
+- NanoFilt
+- NanoStat
+- kraken2
+- seqtk
+- seqkit
+- flye
+- metaMDBG
+- myloasm
+- minimap2
+- racon
+- amrfinder
+- Python 3 with pandas/numpy/matplotlib/scipy
 
-If everything ran correctly, your directory should look like this:
+## Final note
 
-```text
-listeria_as/
-├── scripts/                  # All the bash and python scripts
-├── raw/                      # Where you put your initial .bam files
-├── processing/
-│   ├── fastq/                # Result of Step 1
-│   ├── filtered/             # Result of Step 3
-│   ├── kraken2/              # Result of Step 6
-│   ├── listeria/             # Result of Step 7
-│   ├── assemblies/           # Result of Step 8
-│   └── report/               # Result of Steps 15-17
-└── plots/                    # Result of Step 12 (the python script)
-```
-
-Enjoy your smooth, idiot-proof bioinformatics experience!
+If you only change one thing before running: make sure every placeholder path is replaced with real paths for your system. Most failed runs come from path mismatches.

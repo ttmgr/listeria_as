@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Export Kraken2 read/contig classifications to spreadsheet-ready tables.
+Kraken2 export helper.
+Purpose: turn Kraken2 read and contig outputs into clean CSV/XLSX tables.
 
 Input files:
   - classified_*.txt

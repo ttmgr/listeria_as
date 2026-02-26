@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 7: Compile all NanoStat results into a single CSV
-# Submit as: sbatch --dependency=afterok:<NANOSTAT_JOB_ID> 07_compile_stats.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 7: Merge per-sample QC and Listeria summaries into shared tables.
+# Input: processing/nanostat/*.txt and processing/listeria/listeria_summary.tsv
+# Output: processing/stats/read_metrics_summary.csv and listeria_summary.csv
+# Run: sbatch --dependency=afterok:<NANOSTAT_JOB_ID> scripts/07_compile_stats.sh
+# -----------------------------------------------------------------------------
 NANOSTAT_DIR="/path/to/project/processing/nanostat"
 LISTERIA_DIR="/path/to/project/processing/listeria"
 OUTPUT_DIR="/path/to/project/processing/stats"

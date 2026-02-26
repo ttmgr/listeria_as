@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Step 20: Export pipeline tables as spreadsheets.
+Spreadsheet export helper.
+Purpose: convert pipeline CSV/TSV tables into Excel-friendly files.
 
 Exports every CSV/TSV table under <base_dir>/processing to:
   - Individual XLSX files in <base_dir>/processing/spreadsheets/

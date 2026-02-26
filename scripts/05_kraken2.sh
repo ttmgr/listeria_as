@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 5: Taxonomic classification with Kraken2
-# Submit as: sbatch --array=1-66 05_kraken2.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 5: Classify each filtered read taxonomically with Kraken2.
+# Input: processing/nanofilt/filtered_<sample>.fastq
+# Output: processing/kraken2/report_<sample>.txt and classified_<sample>.txt
+# Run: sbatch --array=1-N scripts/05_kraken2.sh
+# -----------------------------------------------------------------------------
 INPUT_DIR="/path/to/project/processing/nanofilt"
 OUTPUT_DIR="/path/to/project/processing/kraken2"
 KRAKEN2_DB="/lustre/groups/hpc/urban_lab/datasets/ncbi/kraken2_core"

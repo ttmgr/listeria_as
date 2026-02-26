@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 14: Extract Listeria contigs + compute contig-level stats
-# Submit as: sbatch --array=1-66 --dependency=afterok:<KRAKEN_CONTIGS> 14_listeria_contigs.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 14: Extract contigs classified as Listeria and summarize contig metrics.
+# Input: Kraken2 contig classification files and assembly FASTA files
+# Output: Listeria-only contigs plus processing/listeria/listeria_contigs_summary.tsv
+# Run: sbatch --array=1-N --dependency=afterok:<KRAKEN_CONTIGS> scripts/14_listeria_contigs.sh
+# -----------------------------------------------------------------------------
 KRAKEN_CONTIG_DIR="/path/to/project/processing/kraken2_contigs"
 FLYE_DIR="/path/to/project/processing/racon"
 MDBG_DIR="/path/to/project/processing/mdbg"

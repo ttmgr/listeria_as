@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 10: Convert filtered FASTQ → FASTA using seqkit
-# Submit as: sbatch --array=1-66 10_seqkit_fq2fa.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 10: Convert filtered reads from FASTQ to FASTA format.
+# Input: processing/nanofilt/filtered_<sample>.fastq
+# Output: processing/fasta/<sample>.fasta
+# Run: sbatch --array=1-N scripts/10_seqkit_fq2fa.sh
+# -----------------------------------------------------------------------------
 INPUT_DIR="/path/to/project/processing/nanofilt"
 OUTPUT_DIR="/path/to/project/processing/fasta"
 FILELIST="/path/to/project/filelist.txt"

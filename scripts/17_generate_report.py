@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Step 17: Generate comprehensive HTML report for Nanopore pipeline.
+Step 17 report builder (legacy version).
+Purpose: create a self-contained HTML summary of QC, Listeria, AMR, and methods.
 
 Includes:
   - Methods quick sheet (tools, versions, flags, order)

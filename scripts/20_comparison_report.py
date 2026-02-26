@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Step 20: Black Sample Comparison Report
-Compares Adaptive Sampling (AS) vs Normal (N) sequencing across three
-experimental groups (Sponge/PowerSoil, Cotton/Zymo, Zymo/Zymo).
+Step 20 comparison report.
+Purpose: compare Adaptive Sampling (AS) vs Normal (N) across the defined Black group.
 
 Usage:
     python3 20_comparison_report.py <base_dir>

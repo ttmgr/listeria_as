@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Step 22: Local Visualization — PhD-Quality Figures & Summary Tables
-Generates SEPARATE reports for Black and Blue colour groups.
+Step 22 local plotting and figure export.
+Purpose: generate publication-ready figures and summaries on a local machine.
+Creates separate outputs for Black and Blue sample groups.
 
 Usage:
     python3 22_local_plots.py <base_dir>

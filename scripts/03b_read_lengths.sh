@@ -2,11 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 3b: Compute per-read lengths for raw and filtered FASTQ
-# Produces aggregated TSVs consumed by addon step 26.
-# Submit as: sbatch --array=1-66 --dependency=afterok:<NANOFILT_JOB> 03b_read_lengths.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 3b: Build read-length distributions for raw and filtered reads.
+# Input: processing/samtools/<sample>.fastq and processing/nanofilt/filtered_<sample>.fastq
+# Output: processing/read_lengths_raw_agg.tsv and processing/read_lengths_filtered_agg.tsv
+# Run: sbatch --array=1-N --dependency=afterok:<NANOFILT_JOB> scripts/03b_read_lengths.sh
+# -----------------------------------------------------------------------------
 RAW_DIR="/path/to/project/processing/samtools"
 FILT_DIR="/path/to/project/processing/nanofilt"
 WORK_DIR="/path/to/project"

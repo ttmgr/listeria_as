@@ -2,10 +2,12 @@
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-# ============================================================
-# Step 2: Adapter trimming with Porechop
-# Submit as: sbatch --array=1-66 --dependency=afterok:<JOB1_ID> 02_porechop.sh
-# ============================================================
+# -----------------------------------------------------------------------------
+# Step 2: Trim sequencing adapters from reads.
+# Input: processing/samtools/<sample>.fastq
+# Output: processing/porechop/trimmed_<sample>.fastq
+# Run: sbatch --array=1-N --dependency=afterok:<JOB1_ID> scripts/02_porechop.sh
+# -----------------------------------------------------------------------------
 INPUT_DIR="/path/to/project/processing/samtools"
 OUTPUT_DIR="/path/to/project/processing/porechop"
 FILELIST="/path/to/project/filelist.txt"

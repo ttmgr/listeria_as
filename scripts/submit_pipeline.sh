@@ -1,8 +1,10 @@
 #!/bin/bash
-# ============================================================
-# Smart pipeline submission — skips completed steps
+# -----------------------------------------------------------------------------
+# Main launcher for the Listeria adaptive-sampling workflow.
+# What it does: submits all pipeline steps with dependencies and skips completed outputs.
+# Before running: set BAM_DIR and WORK_DIR to real paths on your system.
 # Usage: cd /path/to/project && bash scripts/submit_pipeline.sh
-# ============================================================
+# -----------------------------------------------------------------------------
 BAM_DIR="/path/to/BAM_files"
 WORK_DIR="/path/to/project"
 SCRIPT_DIR="${WORK_DIR}/scripts"
