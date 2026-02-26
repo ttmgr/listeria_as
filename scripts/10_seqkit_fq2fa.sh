@@ -1,45 +1,25 @@
 #!/bin/bash
-#SBATCH -p cpu_p
-#SBATCH -q cpu_normal
-#SBATCH --mem=120G
-#SBATCH -t 1:00:00
-#SBATCH --nice=10000
-#SBATCH --mail-user=timthilomaria.reska@helmholtz-munich.de
-#SBATCH --mail-type=FAIL
-#SBATCH -c 20
-#SBATCH --job-name=seqkit_fq2fa
-#SBATCH -o /home/haicu/ttreska57/logs/%x_%A_%a.out
-#SBATCH -e /home/haicu/ttreska57/logs/%x_%A_%a.err
-
 # Activate conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate tim
-
 # ============================================================
 # Step 10: Convert filtered FASTQ → FASTA using seqkit
 # Submit as: sbatch --array=1-66 10_seqkit_fq2fa.sh
 # ============================================================
-
-INPUT_DIR="/lustre/groups/hpc/urban_lab/projects/tim/processing/nanofilt"
-OUTPUT_DIR="/lustre/groups/hpc/urban_lab/projects/tim/processing/fasta"
-FILELIST="/lustre/groups/hpc/urban_lab/projects/tim/filelist.txt"
-
+INPUT_DIR="/path/to/project/processing/nanofilt"
+OUTPUT_DIR="/path/to/project/processing/fasta"
+FILELIST="/path/to/project/filelist.txt"
 mkdir -p "$OUTPUT_DIR"
-
 # Get the filename for this array task
 BAM_FILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$FILELIST")
 BASENAME=$(basename "$BAM_FILE" .bam)
 INPUT_FASTQ="${INPUT_DIR}/filtered_${BASENAME}.fastq"
-
 if [ ! -f "$INPUT_FASTQ" ]; then
     echo "ERROR: Input file $INPUT_FASTQ does not exist. Skipping."
     exit 1
 fi
-
 echo "Processing: ${BASENAME}"
 echo "Start time: $(date)"
-
 seqkit fq2fa "$INPUT_FASTQ" -o "${OUTPUT_DIR}/${BASENAME}.fasta"
-
 echo "Finished: $(date)"
 echo "Output size: $(du -h ${OUTPUT_DIR}/${BASENAME}.fasta)"
