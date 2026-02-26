@@ -16,6 +16,16 @@ Adaptive sampling is a real-time enrichment approach during Nanopore sequencing.
 
 This drastically increases the sequencing yield for targets of interest (like *Listeria*) without the need for complex physical enrichment in the wet lab before sequencing.
 
+## The Goal: Benchmarking AS vs Native (N) Sequencing
+The original use-case for this pipeline is directly comparing **Adaptive Sampling (AS)** against **Native (N)** (un-enriched) sequencing runs of the same samples.
+
+The pipeline is explicitly designed to handle datasets where each sample was run both ways. It outputs aggregated comparisons on:
+- **Total Yield vs Length Dropout**: Analyzing how the 100bp length filter differentially affects AS (often ~30% dropout) versus N (often ~70% dropout) due to the ejection mechanics.
+- **Target Enrichment Percentage**: Measuring the relative abundance of the target organism (e.g. *Listeria*) compared to the total microbiome background in AS versus N.
+- **Assembly Quality**: Comparing the length and coverage of final target-specific contigs when assembled from AS-enriched reads versus N reads.
+
+If your dataset contains matched pairs (e.g. `barcode01_AS` and `barcode01_N`), the pipeline will automatically group them in the final HTML report and generate direct side-by-side distribution plots.
+
 ---
 
 ## Pipeline Architecture
