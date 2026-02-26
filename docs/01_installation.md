@@ -69,6 +69,29 @@ amrfinder --update
 
 ---
 
+## 5) Dorado Installation and Models (required for step 9b)
+
+Dorado is heavily optimized for NVIDIA GPUs or Apple M-series chips and operates outside of Conda. 
+
+### Installing the Dorado Binary
+1. Download the correct pre-compiled binary for your system from the [Dorado GitHub Releases](https://github.com/nanoporetech/dorado/releases) (e.g., `dorado-x.y.z-linux-x64.tar.gz`).
+2. Extract the archive:
+   ```bash
+   tar -xvf dorado-*-linux-x64.tar.gz
+   ```
+3. Add the `bin/` directory to your system `$PATH`, or place the path directly into the `scripts/09b_dorado_polish.sh` file.
+
+### Downloading the Polishing Models
+Dorado needs to download specific machine learning models for polishing. It is highly recommended to declare a persistent directory so Dorado doesn't re-download models on every run.
+
+```bash
+export DORADO_MODELS_DIRECTORY="/path/to/my/dorado_models"
+dorado download --model all
+```
+*(Note: You must edit `scripts/09b_dorado_polish.sh` to include your specific `DORADO_MODELS_DIRECTORY` line so it knows where to find the downloaded models when submitted to a cluster).*
+
+---
+
 ## Where to get each tool (Official package / docs links)
 - **Bioconda setup:** https://bioconda.github.io/
 - **samtools:** https://bioconda.github.io/recipes/samtools/README.html

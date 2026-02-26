@@ -89,7 +89,10 @@ mamba create -n listeria_as \
 mamba activate listeria_as
 ```
 
-### 2) Run Orchestrator
+### 2) Install Dorado Basecaller & Polisher
+Dorado must be installed manually outside of Mamba. See [docs/01_installation.md](docs/01_installation.md) for full instructions on downloading the binary and models.
+
+### 3) Run Orchestrator
 
 1. **Clone the repo** and enter it.
 2. **Edit path variables** in `scripts/submit_pipeline.sh` (replace `/path/to/project` with your real paths).

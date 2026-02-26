@@ -29,6 +29,10 @@ READS_DIR="${PROJECT}/processing/nanofilt"
 ASSEMBLY_BASE="${PROJECT}/processing/assemblies"
 THREADS="${SLURM_CPUS_PER_TASK:-8}"
 
+# --- Dorado Models ---
+# Point this to where you ran `dorado download --model all`
+export DORADO_MODELS_DIRECTORY="/path/to/my/dorado_models"
+
 # --- Resolve sample ID from filelist ---
 BAM_PATH=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$FILELIST")
 ID=$(basename "$BAM_PATH" .bam)
