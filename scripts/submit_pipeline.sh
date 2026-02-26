@@ -59,7 +59,7 @@ echo "  Checking pipeline status..."
 echo "========================================="
 echo ""
 # Track job IDs for dependency chaining
-JOB1="" JOB2="" JOB3="" JOB4="" JOB5="" JOB6="" JOB7="" JOB8="" JOB8B="" JOB9="" JOB10="" JOB11="" JOB13="" JOB14="" JOB15="" JOB16="" JOB18="" JOB17=""
+JOB1="" JOB2="" JOB3="" JOB3B="" JOB4="" JOB5="" JOB6="" JOB7="" JOB8="" JOB8B="" JOB9="" JOB9B="" JOB10="" JOB11="" JOB13="" JOB14="" JOB15="" JOB16="" JOB18="" JOB17=""
 # ---- Step 1: samtools BAM → FASTQ ----
 MISSING_1=$(check_step "processing/samtools" "BASENAME.fastq")
 if [ "$MISSING_1" -eq 0 ]; then
@@ -170,6 +170,22 @@ else
     PENDING_9=$(get_pending_tasks "processing/racon" "polished_BASENAME.fasta")
     JOB9=$(sbatch --array=${PENDING_9} ${POST_NANOFILT_DEP} --parsable ${SCRIPT_DIR}/09_metaflye.sh)
     echo "→ Step 9 (metaFlye)     — submitting $MISSING_9 jobs: $JOB9"
+fi
+# ---- Step 9b: Dorado Polish ----
+MISSING_9B=$(check_step "processing/assemblies/flye_polished" "BASENAME/polished_assembly.fasta")
+if [ "$MISSING_9B" -eq 0 ]; then
+    echo "✓ Step 9b(Dorado)       — DONE ($NUM_FILES/$NUM_FILES)"
+else
+    PENDING_9B=$(get_pending_tasks "processing/assemblies/flye_polished" "BASENAME/polished_assembly.fasta")
+    DORADO_DEPS=""
+    [ -n "$JOB8" ] && DORADO_DEPS="${JOB8}"
+    [ -n "$JOB8B" ] && DORADO_DEPS="${DORADO_DEPS:+${DORADO_DEPS}:}${JOB8B}"
+    [ -n "$JOB9" ] && DORADO_DEPS="${DORADO_DEPS:+${DORADO_DEPS}:}${JOB9}"
+    [ -n "$JOB3" ] && DORADO_DEPS="${DORADO_DEPS:+${DORADO_DEPS}:}${JOB3}"
+    DEP_9B=""
+    [ -n "$DORADO_DEPS" ] && DEP_9B="--dependency=afterok:${DORADO_DEPS}"
+    JOB9B=$(sbatch --array=${PENDING_9B} ${DEP_9B} --parsable ${SCRIPT_DIR}/09b_dorado_polish.sh)
+    echo "→ Step 9b(Dorado)       — submitting $MISSING_9B jobs: $JOB9B"
 fi
 # ---- Step 10: seqkit FASTQ → FASTA ----
 MISSING_10=$(check_step "processing/fasta" "BASENAME.fasta")
@@ -282,6 +298,7 @@ echo "                                         ├─ 5 kraken2 → 6 listeria �
 echo "                                         ├─ 8 metaMDBG ──┬─ 13 kraken2_ctg ──┤"
 echo "                                         ├─ 8b myloasm ──┤                   │"
 echo "                                         ├─ 9 metaFlye ──┘      │            │"
+echo "                                         │   └─ 9b Dorado       │            │"
 echo "                                         │              14 list. contigs ─────┤"
 echo "                                         └─ 10 seqkit ─┬─ 11 AMRFinder+ ─────┤"
 echo "                                                     ├─ 15 list. overview ──┴─ 17 REPORT"

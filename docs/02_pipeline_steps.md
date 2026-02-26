@@ -15,6 +15,7 @@ The workflow consists of modular scripts located in the `scripts/` directory.
 | **7.** | `06_listeria_extract.sh` | Extracts target reads (e.g., *Listeria*) and compiles per-sample summaries |
 | **8.** | `07_compile_stats.sh` | Compile read and Target summary tables |
 | **9.** | `08_metamdbg.sh`, `08b_myloasm.sh`, `09_metaflye.sh` | Assembly workflows using 3 distinct long-read assemblers |
+| **9b.**| `09b_dorado_polish.sh` | Aligns reads back to draft assemblies with `dorado aligner`, then polishes with `dorado polish --bacteria` |
 | **10.**| `10_seqkit_fq2fa.sh` | FASTQ to FASTA conversion for reads |
 | **11.**| `11_amrfinderplus.sh` | AMR/virulence calls on reads and contigs |
 | **12.**| `13_kraken2_contigs.sh` | Taxonomy on assembled contigs |
@@ -71,3 +72,11 @@ This section explains the command-line flags uniquely used in our core workflow.
 ### `amrfinder` / AMRFinderPlus (step 11)
 - `--plus`: include the extended AMRFinderPlus database (AMR + additional marker classes like virulence factors).
 - `-n <fasta>`: nucleotide FASTA input.
+
+### `dorado aligner` (step 9b)
+- `dorado aligner <draft.fasta> <reads>`: aligns reads (BAM or FASTQ) to a draft assembly reference.
+- Output is piped to `samtools sort` and then indexed with `samtools index`.
+
+### `dorado polish` (step 9b)
+- `dorado polish <aligned.bam> <draft.fasta>`: runs the polishing model on aligned reads to produce a corrected consensus.
+- `--bacteria`: resolves a bacterial-specific polishing model automatically based on the input data type. Use this flag for any bacterial genome assembly.
