@@ -34,19 +34,58 @@ This script will submit jobs 1-20 in order. Depending on HPC loading, this can t
 squeue -u "$USER"
 ```
 
----
+## Approach 2: Standalone Workstation (Multi-Core Linux/macOS)
 
-## Approach 2: Local / Manual Execution
+If you don't have a SLURM cluster but *do* have a powerful workstation (e.g. 32+ cores, 128GB+ RAM), you can run the pipeline locally using a simple `bash` loop.
 
-For single-sample tests or local runs on small data sets (or servers lacking SLURM scheduler overhead), you can execute the bash scripts manually. 
+Because the scripts internally rely on the `$SLURM_ARRAY_TASK_ID` variable to know which sample to process, we can simply trick the scripts into thinking they are running on a cluster by exporting that variable in a loop.
 
-Because the scripts internally rely on SLURM array task IDs, you must set these variables manually in your terminal before running the script:
+### Creating a Local Run Script
+Save the following code as `run_local.sh` in the root of the repository:
 
 ```bash
-export SLURM_ARRAY_TASK_ID=1
-export SLURM_CPUS_PER_TASK=4
-bash scripts/01_samtools_bam2fastq.sh
+#!/bin/bash
+# run_local.sh - Executes the pipeline on a standalone workstation
+
+# 1. Edit your paths in the scripts as usual
+# 2. Make sure filelist.txt is generated (has one BAM file per line)
+TOTAL_SAMPLES=$(wc -l < "/path/to/project/filelist.txt")
+
+# Set how many cores each job should use
+export SLURM_CPUS_PER_TASK=8
+
+echo "Starting local execution for $TOTAL_SAMPLES samples..."
+
+# Loop through every sample sequentially
+for i in $(seq 1 $TOTAL_SAMPLES); do
+    echo "Processing Task ID: $i"
+    export SLURM_ARRAY_TASK_ID=$i
+    
+    # Run the steps you need (uncomment as necessary)
+    bash scripts/01_samtools_bam2fastq.sh
+    # bash scripts/02_porechop.sh
+    # bash scripts/03_nanofilt.sh
+    bash scripts/05_kraken2.sh
+    bash scripts/06_listeria_extract.sh
+    # bash scripts/09_metaflye.sh
+done
+
+echo "Sample processing complete. Now running aggregate steps..."
+
+# Run the summary scripts (these only need to run once at the end)
+bash scripts/15_compile_listeria_overview.sh
+bash scripts/16_compile_qc_metrics.sh
+bash scripts/17_generate_report.sh
+
+echo "Pipeline Finished!"
 ```
+
+Run this script in your terminal:
+```bash
+bash run_local.sh
+```
+
+*Note: This runs samples sequentially (one after another). If you want to run samples in parallel on a massive server, look into using `GNU parallel` instead of a `for` loop.*
 
 ---
 
