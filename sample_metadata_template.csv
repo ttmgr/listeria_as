@@ -1,0 +1,7 @@
+SampleName,Barcode,DNA_Concentration_ng_ul,Group,Swab,Kit,Condition,Type,Spike_Details
+A1,barcode03,15.2,Black_A,Sponge,PowerSoil,AS,Sample,None
+A1,barcode03,15.2,Black_A,Sponge,PowerSoil,N,Sample,None
+A2,barcode04,18.4,Black_A,Sponge,PowerSoil,AS,Sample,None
+A2,barcode04,18.4,Black_A,Sponge,PowerSoil,N,Sample,None
+Lm_Ctrl,barcode31,35.0,Lm_Control,Zymo,Zymo,AS,Control,Lm_Strain_10403S
+Lm_Ctrl,barcode31,35.0,Lm_Control,Zymo,Zymo,N,Control,Lm_Strain_10403S
