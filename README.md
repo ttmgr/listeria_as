@@ -38,6 +38,205 @@ bash scripts/submit_pipeline.sh
 
 This orchestrator submits and links the full workflow (steps 1 to 20), and skips outputs that already exist.
 
+## Install everything (copy/paste)
+
+This pipeline is designed for Linux/macOS with conda-compatible package management. For Windows, use WSL2.
+
+### 1) Set up Bioconda channels (one time)
+
+```bash
+conda config --add channels bioconda
+conda config --add channels conda-forge
+conda config --set channel_priority strict
+```
+
+### 2) Create one environment with all required tools
+
+```bash
+conda create -n listeria_as \
+  python=3.10 \
+  samtools porechop nanofilt nanostat kraken2 seqtk seqkit \
+  flye metamdbg myloasm minimap2 racon ncbi-amrfinderplus \
+  pandas numpy scipy matplotlib \
+  -c conda-forge -c bioconda --strict-channel-priority
+```
+
+Then activate:
+
+```bash
+conda activate listeria_as
+```
+
+If you want to keep using your existing `tim` environment, install the same package set into that environment instead of creating `listeria_as`.
+
+### 3) Quick check that tools are available
+
+```bash
+samtools --version
+kraken2 --version
+flye --version
+amrfinder --version
+```
+
+## Where to get each tool (official package/docs links)
+
+- Bioconda setup: <https://bioconda.github.io/>
+- samtools: <https://bioconda.github.io/recipes/samtools/README.html>
+- porechop: <https://bioconda.github.io/recipes/porechop/README.html>
+- NanoFilt: <https://bioconda.github.io/recipes/nanofilt/README.html>
+- NanoStat: <https://bioconda.github.io/recipes/nanostat/README.html>
+- kraken2: <https://bioconda.github.io/recipes/kraken2/README.html>
+- seqtk: <https://bioconda.github.io/recipes/seqtk/README.html>
+- seqkit: <https://bioconda.github.io/recipes/seqkit/README.html>
+- Flye: <https://bioconda.github.io/recipes/flye/README.html>
+- metaMDBG: <https://bioconda.github.io/recipes/metamdbg/README.html>
+- Myloasm: <https://bioconda.github.io/recipes/myloasm/README.html>
+- minimap2: <https://bioconda.github.io/recipes/minimap2/README.html>
+- racon: <https://bioconda.github.io/recipes/racon/README.html>
+- AMRFinderPlus: <https://bioconda.github.io/recipes/ncbi-amrfinderplus/README.html>
+
+## Databases: where to get them and how to configure
+
+### Kraken2 database (required for steps 5 and 13)
+
+Current scripts use a `KRAKEN2_DB` (or `KRAKEN_DB`) variable in:
+
+- `scripts/05_kraken2.sh`
+- `scripts/13_kraken2_contigs.sh`
+
+Set those variables to your Kraken2 database directory.
+
+Official options:
+
+1. Build standard Kraken2 DB from NCBI/RefSeq (official manual):
+
+```bash
+kraken2-build --standard --threads 24 --db /path/to/kraken2_standard
+```
+
+2. Use official prebuilt Kraken2/Bracken indexes (AWS index listed by Kraken2 wiki):
+
+- <https://benlangmead.github.io/aws-indexes/k2>
+
+Reference docs:
+
+- Kraken2 manual: <https://github.com/DerrickWood/kraken2/wiki/Manual>
+
+### AMRFinderPlus database (required for step 11)
+
+Install/update the AMRFinderPlus database with:
+
+```bash
+amrfinder --update
+```
+
+Alternative (custom location):
+
+```bash
+amrfinder_update -d /path/to/amrfinder_db
+```
+
+Then use:
+
+```bash
+amrfinder -d /path/to/amrfinder_db/latest ...
+```
+
+Reference docs:
+
+- AMRFinder homepage: <https://www.ncbi.nlm.nih.gov/pathogens/antimicrobial-resistance/AMRFinder/>
+- AMRFinder wiki: <https://github.com/ncbi/amr/wiki>
+
+## Flag reference (all core pipeline command flags)
+
+This section explains the command-line flags used in the core workflow scripts.
+
+### SLURM submission flags (used by `submit_pipeline.sh`)
+
+- `--array=...`: run one script instance per sample/task index.
+- `--dependency=afterok:<jobid>`: start only after another job finishes successfully.
+- `--parsable`: print job ID only (easy for dependency chaining).
+
+### `samtools` (steps 1 and 9)
+
+- `fastq -@ 4`: `-@` sets worker threads for BAM-to-FASTQ conversion.
+- `view -b`: `-b` outputs BAM instead of SAM.
+- `view -@ <n>` and `sort -@ <n>`: threads for conversion/sorting.
+- `sort -o <file>`: output BAM path.
+- `index <bam>`: build BAM index (`.bai`).
+
+### `porechop` (step 2)
+
+- `-i <file>`: input FASTQ.
+- `-o <file>`: output trimmed FASTQ.
+- `-t <n>`: number of threads.
+
+### `NanoFilt` (step 3)
+
+- `-l 100`: keep reads with length >= 100 bp.
+
+### `NanoStat` (steps 4 and 6)
+
+- `--fastq <file>`: input FASTQ file.
+- `--name <text>`: sample label used in output.
+- `--outdir <dir>`: output directory.
+- `--tsv`: write tab-separated output format.
+
+### `kraken2` (steps 5 and 13)
+
+- `--db <dir>`: Kraken2 database directory.
+- `--use-names`: print scientific names in classification output.
+- `--threads <n>`: parallel threads.
+- `--report <file>`: write sample-level clade summary report.
+- `--output <file>`: write per-read or per-contig classification output.
+
+### `seqtk` (step 6)
+
+- `subseq <fastq> <id_file>`: extract reads whose IDs are listed in `id_file`.
+
+### `metaMDBG` (step 8)
+
+- `asm`: run assembly mode.
+- `--out-dir <dir>`: sample output directory.
+- `--in-ont <fastq>`: ONT reads input.
+- `--threads <n>`: assembly threads.
+
+### `myloasm` (step 8b)
+
+- `-o <dir>`: output directory.
+- `-t <n>`: threads.
+
+### `flye` (step 9)
+
+- `--meta`: metagenome assembly mode.
+- `--nano-hq <fastq>`: ONT high-quality reads input.
+- `--threads <n>`: threads.
+- `-o <dir>`: output directory.
+
+### `minimap2` (step 9)
+
+- `-ax map-ont`: preset for ONT read-to-reference alignment with SAM output.
+- `-t <n>`: threads.
+
+### `racon` (step 9)
+
+- `-t <n>`: threads for polishing.
+
+### `seqkit` (steps 10 and 18)
+
+- `fq2fa`: convert FASTQ to FASTA.
+- `fq2fa -o <file>`: output FASTA path.
+- `stats -a`: include all summary statistics.
+- `stats -T`: tabular output.
+- `stats -j <n>`: threads.
+
+### `amrfinder` / AMRFinderPlus (step 11)
+
+- `--plus`: include the extended AMRFinderPlus database (AMR + additional marker classes).
+- `-n <fasta>`: nucleotide FASTA input.
+- `--threads <n>`: threads.
+- `-o <file>`: output TSV path.
+
 ## Before first run: required edits
 
 Most scripts use placeholder paths like:
@@ -140,25 +339,6 @@ Assembly and Kraken2 steps can require substantial RAM/CPU, so full runs are bet
 ```bash
 bash scripts/check_report_inputs.sh /path/to/project
 ```
-
-## Minimal software list
-
-Core tools used across scripts:
-
-- samtools
-- porechop
-- NanoFilt
-- NanoStat
-- kraken2
-- seqtk
-- seqkit
-- flye
-- metaMDBG
-- myloasm
-- minimap2
-- racon
-- amrfinder
-- Python 3 with pandas/numpy/matplotlib/scipy
 
 ## Final note
 
