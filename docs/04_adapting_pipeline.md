@@ -33,20 +33,20 @@ To target a different organism, you must adjust the search term regex logic in p
 Look for the read extraction block reading the kraken outputs:
 ```bash
 # Current
-grep -i "listeria" "$KRAKEN_DIR/${ID}_AS_kraken2_output.txt" | awk '{print $2}' > "$OUT_DIR/${ID}_AS_listeria_read_ids.txt"
+grep "Listeria" "$KRAKEN_DIR/${ID}_AS_kraken2_output.txt" | awk '{print $2}' > "$OUT_DIR/${ID}_AS_listeria_read_ids.txt"
 
-# Change to target Salmonella:
-grep -i "salmonella" "$KRAKEN_DIR/${ID}_AS_kraken2_output.txt" | awk '{print $2}' > "$OUT_DIR/${ID}_AS_salmonella_read_ids.txt"
+# Change to target Salmonella (Note: capitalization is required!):
+grep "Salmonella" "$KRAKEN_DIR/${ID}_AS_kraken2_output.txt" | awk '{print $2}' > "$OUT_DIR/${ID}_AS_salmonella_read_ids.txt"
 ```
 
 **File 2: `scripts/14_listeria_contigs.sh`**
 Similarly, for filtering assembled contigs:
 ```bash
 # Current
-grep -i "listeria" "$KRAKEN_DIR/${ID}_AS_${asmb}_kraken2_output.txt" | awk '{print $2}' > "$OUT_DIR/${ID}_AS_${asmb}_listeria_contig_ids.txt"
+grep "Listeria" "$KRAKEN_DIR/${ID}_AS_${asmb}_kraken2_output.txt" | awk '{print $2}' > "$OUT_DIR/${ID}_AS_${asmb}_listeria_contig_ids.txt"
 
-# Change to target Pseudomonas:
-grep -i "pseudomonas" "$KRAKEN_DIR/${ID}_AS_${asmb}_kraken2_output.txt" | awk '{print $2}' > "$OUT_DIR/${ID}_AS_${asmb}_pseudomonas_contig_ids.txt"
+# Change to target Pseudomonas (Note: capitalization is required!):
+grep "Pseudomonas" "$KRAKEN_DIR/${ID}_AS_${asmb}_kraken2_output.txt" | awk '{print $2}' > "$OUT_DIR/${ID}_AS_${asmb}_pseudomonas_contig_ids.txt"
 ```
 
 ### Naming Conventions Downstream

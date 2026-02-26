@@ -6,10 +6,10 @@ It is designed for high-performance computing batch execution (SLURM), but can a
 
 ---
 
-## 🦠 Why this matters for food safety
+## Why this matters for food safety
 *Listeria monocytogenes* is a foodborne pathogen that can survive in food-processing environments and cause severe disease. Rapidly detecting *Listeria* signal directly from sequencing data, without needing days of cell culturing, helps food safety teams act faster during contamination checks and outbreak investigations.
 
-## 🧬 What is Adaptive Sampling?
+## What is Adaptive Sampling?
 Adaptive sampling is a real-time enrichment approach during Nanopore sequencing. As DNA passes through a sequencing pore, the instrument basecalls the first part of the read, compares it to a target reference, and decides to either:
 - **Keep** sequencing the read if it looks like target DNA.
 - **Eject** the read early if it looks off-target.
@@ -18,7 +18,7 @@ This drastically increases the sequencing yield for targets of interest (like *L
 
 ---
 
-## 🗺️ Pipeline Architecture
+## Pipeline Architecture
 
 ```mermaid
 graph TD
@@ -75,12 +75,25 @@ graph TD
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
+
+### 1) Create Environment with Mamba
+```bash
+mamba create -n listeria_as \
+  python=3.10 \
+  samtools porechop nanofilt nanostat kraken2 seqtk seqkit \
+  flye metamdbg myloasm minimap2 racon ncbi-amrfinderplus \
+  pandas numpy scipy matplotlib \
+  -c conda-forge -c bioconda --strict-channel-priority
+
+mamba activate listeria_as
+```
+
+### 2) Run Orchestrator
 
 1. **Clone the repo** and enter it.
 2. **Edit path variables** in `scripts/submit_pipeline.sh` (replace `/path/to/project` with your real paths).
-3. **Confirm tools are available** via Mamba/Conda.
-4. **Run the orchestrator script:**
+3. **Run the orchestrator script:**
     ```bash
     bash scripts/submit_pipeline.sh
     ```
@@ -88,29 +101,29 @@ graph TD
 
 ---
 
-## 📚 Documentation Table of Contents
+## Documentation Table of Contents
 
 We have broken down the pipeline documentation into specific guides to make it easier to digest:
 
-1. 💻 **[Installation and Setup](docs/01_installation.md)**
+1. **[Installation and Setup](docs/01_installation.md)**
    - How to install Mamba and set up the Conda environment.
    - Where to download the Kraken2 and AMRFinderPlus databases.
    - Official documentation links for all tools used.
 
-2. ⚙️ **[Pipeline Workflow and Architecture](docs/02_pipeline_steps.md)**
+2. **[Pipeline Workflow and Architecture](docs/02_pipeline_steps.md)**
    - A step-by-step breakdown of what every script (`01` through `22`) accomplishes.
    - An explanation of the specific command-line flags used in the tools.
 
-3. 🚀 **[Execution and Troubleshooting Guide](docs/03_execution_guide.md)**
+3. **[Execution and Troubleshooting Guide](docs/03_execution_guide.md)**
    - How to run the pipeline on a SLURM high-performance cluster.
    - How to manually execute steps locally.
    - Common errors (e.g., missing Kraken DBs) and fast checks.
 
-4. 🔄 **[Adapting the Pipeline](docs/04_adapting_pipeline.md)**
+4. **[Adapting the Pipeline](docs/04_adapting_pipeline.md)**
    - How to use the `sample_metadata_template.csv` to map barcodes to real sample conditions.
    - How to easily change the target regex logic to extract **Salmonella**, **E. coli**, or any other organism instead of *Listeria*.
 
 ---
 
-## 📞 Final Note
+## Final Note
 If you only change one thing before running: make sure **every placeholder path** is replaced with real paths for your system. Most failed runs come from path mismatches!
