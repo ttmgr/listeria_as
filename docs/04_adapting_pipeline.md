@@ -12,13 +12,13 @@ A template (`sample_metadata_template.csv`) is provided in the repository root.
 
 **Example Structure:**
 ```csv
-SampleName,Barcode,DNA_Concentration,Group,Swab,Kit,Cond,Type,TargetSpike
-A1,barcode03,15.2,Black_A,Sponge,PowerSoil,AS,Sample,None
-A1_N,barcode03,12.1,Black_A,Sponge,PowerSoil,N,Sample,None
+SampleID,Barcode,Condition,Treatment,Replicate,DNA_Conc_ng_ul,Notes
+Sample_A,barcode01,Treatment_1,Drug_X,1,15.2,
+Sample_A,barcode02,Treatment_1,Drug_X,2,14.8,
 ```
 
 ### Applying Metadata in Python Scripts
-To integrate the metadata, ensure your downstream visualization scripts (like `22_local_plots.py`) parse the CSV to map the generic output IDs to the `SampleName` column for axis labeling and comparative grouping.
+To integrate the metadata, ensure your downstream visualization scripts (like `22_local_plots.py`) parse the CSV to map the generic output IDs to the `SampleID` column for axis labeling and comparative grouping.
 
 ---
 

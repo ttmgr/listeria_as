@@ -29,11 +29,11 @@ from datetime import datetime
 # Config
 # ============================================================
 
-BLACK_BARCODES = [3, 4, 5, 6, 7, 14, 15, 16, 18, 19, 26, 27, 28, 29, 30]
+BLACK_BARCODES = [6, 7, 8, 9, 10, 16, 17, 18, 19, 20, 26, 27, 28, 29, 30, 34]
 GROUP_LABELS = {
-    'Black_A': 'A (Sponge / PowerSoil)',
-    'Black_C': 'C (Cotton / Zymo)',
-    'Black_D': 'D (Zymo swab / Zymo)',
+    'Black_A': 'A',
+    'Black_C': 'C',
+    'Black_D': 'D',
 }
 GROUP_COLORS = {'Black_A': '#3b82f6', 'Black_C': '#f59e0b', 'Black_D': '#8b5cf6'}
 
@@ -156,6 +156,22 @@ df_black = df_meta[df_meta['barcode'].isin(BLACK_BARCODES)].copy()
 df_black['dna_concentration_ng_ul'] = pd.to_numeric(df_black['dna_concentration_ng_ul'], errors='coerce').fillna(0)
 print(f"Black samples: {len(df_black)} rows ({df_black['barcode'].nunique()} barcodes × 2 conditions)")
 
+for group_name in list(GROUP_LABELS):
+    sub = df_black[df_black['group'] == group_name]
+    if len(sub) == 0:
+        continue
+    parts = []
+    if 'swab_type' in sub.columns:
+        swabs = [str(v) for v in sub['swab_type'].dropna().unique() if str(v).strip()]
+        if swabs:
+            parts.append('/'.join(swabs))
+    if 'kit' in sub.columns:
+        kits = [str(v) for v in sub['kit'].dropna().unique() if str(v).strip()]
+        if kits:
+            parts.append('/'.join(kits))
+    if parts:
+        GROUP_LABELS[group_name] = f"{group_name.replace('Black_', '')} ({' / '.join(parts)})"
+
 # One row per barcode (DNA concentration is the same for AS and N — same physical sample)
 df_barcode = df_black.drop_duplicates(subset='barcode').copy()
 
@@ -169,6 +185,13 @@ groups_dna = {
     grp: df_barcode[df_barcode['group'] == grp]['dna_concentration_ng_ul'].values
     for grp in ['Black_A', 'Black_C', 'Black_D']
 }
+group_counts = [len(vals) for vals in groups_dna.values() if len(vals) > 0]
+if group_counts and len(set(group_counts)) == 1:
+    group_count_label = f"n={group_counts[0]} per group"
+elif group_counts:
+    group_count_label = "group sizes: " + ', '.join(str(v) for v in group_counts)
+else:
+    group_count_label = "group sizes unavailable"
 
 # Descriptive stats
 desc_rows = []
@@ -204,17 +227,50 @@ print("\n--- Analysis 2: Spearman DNA conc vs volume ---")
 r, p = stats.spearmanr(df_barcode['dna_concentration_ng_ul'], df_barcode['volume_ul'])
 print(f"Spearman r={round(r, 3)}, p={round(p, 4)}")
 
-# Kit comparison: PowerSoil vs Zymo
+# Kit comparison: adapt to whatever the metadata actually contains.
 print("\n--- Analysis 3: DNA concentration by extraction kit ---")
-kit_ps = df_barcode[df_barcode['kit'] == 'PowerSoil']['dna_concentration_ng_ul'].values
-kit_zy = df_barcode[df_barcode['kit'] == 'Zymo']['dna_concentration_ng_ul'].values
-u, p_kit = stats.mannwhitneyu(kit_ps, kit_zy, alternative='two-sided')
-d = effect_size_d(kit_ps, kit_zy)
-print(f"PowerSoil median: {np.median(kit_ps):.3f} ng/µL (n={len(kit_ps)})")
-print(f"Zymo median:      {np.median(kit_zy):.3f} ng/µL (n={len(kit_zy)})")
-print(f"Mann-Whitney U={round(u,1)}, p={round(p_kit, 4)}, Cohen's d={d}")
+kit_groups = {
+    str(kit): df_barcode[df_barcode['kit'] == kit]['dna_concentration_ng_ul'].values
+    for kit in sorted(df_barcode['kit'].dropna().unique())
+}
+kit_rows = []
+for kit_name, vals in kit_groups.items():
+    kit_rows.append({
+        'Kit': kit_name,
+        'n': len(vals),
+        'Median (ng/µL)': round(np.median(vals), 3) if len(vals) else np.nan,
+        'Mean (ng/µL)': round(np.mean(vals), 3) if len(vals) else np.nan,
+    })
+df_kit_desc = pd.DataFrame(kit_rows)
+print(df_kit_desc.to_string(index=False))
 
-# Swab type: Sponge vs Cotton vs Zymo swab
+kit_test_label = 'Only one extraction kit present in metadata; no between-kit statistical test run.'
+kit_significant = False
+kit_test_type = 'not_run'
+d = float('nan')
+
+if len(kit_groups) == 2:
+    kit_names = list(kit_groups)
+    vals_a = kit_groups[kit_names[0]]
+    vals_b = kit_groups[kit_names[1]]
+    u, p_kit = stats.mannwhitneyu(vals_a, vals_b, alternative='two-sided')
+    d = effect_size_d(vals_a, vals_b)
+    kit_test_label = (
+        f"Mann-Whitney U={round(u,1)}, p={round(p_kit, 4)}, Cohen's d={d}"
+    )
+    kit_significant = p_kit < 0.05
+    kit_test_type = 'mannwhitney'
+elif len(kit_groups) > 2:
+    kw_kit = kruskal_wallis(kit_groups, 'DNA by kit')
+    if 'kruskal' in kw_kit:
+        kit_test_label = (
+            f"Kruskal-Wallis H={kw_kit['kruskal']['H']}, p={kw_kit['kruskal']['p']}"
+        )
+        kit_significant = kw_kit['kruskal']['significant']
+        kit_test_type = 'kruskal'
+print(kit_test_label)
+
+# Swab type comparison
 print("\n--- Analysis 4: DNA concentration by swab type ---")
 swab_groups = {
     swab: df_barcode[df_barcode['swab_type'] == swab]['dna_concentration_ng_ul'].values
@@ -294,7 +350,7 @@ if df_pipeline is not None:
             break
 
     GROUPS = ['Black_A', 'Black_C', 'Black_D']
-    GROUP_SHORT = {'Black_A': 'A (Sponge/PS)', 'Black_C': 'C (Cotton/Zymo)', 'Black_D': 'D (Zymo/Zymo)'}
+    GROUP_SHORT = {g: GROUP_LABELS.get(g, g.replace('Black_', '')) for g in GROUPS}
     scores = {g: 0 for g in GROUPS}
 
     for col, label, higher_better in SCORECARD_METRICS:
@@ -375,7 +431,7 @@ else:
     scorecard_html = '''<h2>📊 Method Scorecard</h2>
 <div class="note">⏳ Scorecard will appear here automatically once 
 <code>processing/report/comparison_data.csv</code> exists from the cluster pipeline.</div>
-<table><thead><tr><th>Metric</th><th>A (Sponge/PS)</th><th>C (Cotton/Zymo)</th><th>D (Zymo/Zymo)</th><th>Winner</th><th>KW p</th></tr></thead>
+<table><thead><tr><th>Metric</th><th>{GROUP_LABELS['Black_A']}</th><th>{GROUP_LABELS['Black_C']}</th><th>{GROUP_LABELS['Black_D']}</th><th>Winner</th><th>KW p</th></tr></thead>
 <tbody>\n''' + '\n'.join(
         f'<tr><td>{label}</td><td>—</td><td>—</td><td>—</td><td>⏳</td><td>⏳</td></tr>'
         for _, label, _ in SCORECARD_METRICS
@@ -405,7 +461,7 @@ for i, (vals, color) in enumerate(zip(grp_vals_list, colors)):
     x = np.random.normal(i + 1, 0.05, size=len(vals))
     axes[0].scatter(x, vals, color=color, edgecolors='white', s=50, zorder=5)
 axes[0].set_ylabel('DNA Concentration (ng/µL)')
-axes[0].set_title('DNA Yield by Extraction Group\n(Black samples, n=5 per group)')
+axes[0].set_title(f'DNA Yield by Extraction Group\n(Black samples, {group_count_label})')
 axes[0].spines['top'].set_visible(False)
 axes[0].spines['right'].set_visible(False)
 
@@ -416,9 +472,10 @@ axes[0].text(0.5, 0.98, sig_str, transform=axes[0].transAxes,
              ha='center', va='top', fontsize=9, color='#475569')
 
 # Plot 2: DNA by kit
-kit_labels = ['PowerSoil', 'Zymo']
-kit_vals = [kit_ps, kit_zy]
-kit_colors = ['#3b82f6', '#f59e0b']
+kit_labels = list(kit_groups)
+kit_vals = [kit_groups[k] for k in kit_labels]
+kit_palette = ['#3b82f6', '#f59e0b', '#8b5cf6', '#14b8a6']
+kit_colors = [kit_palette[i % len(kit_palette)] for i in range(len(kit_labels))]
 bp2 = axes[1].boxplot(kit_vals, tick_labels=kit_labels, patch_artist=True,
                       medianprops=dict(color='black', linewidth=2))
 for patch, color in zip(bp2['boxes'], kit_colors):
@@ -428,12 +485,12 @@ for i, (vals, color) in enumerate(zip(kit_vals, kit_colors)):
     x = np.random.normal(i + 1, 0.05, size=len(vals))
     axes[1].scatter(x, vals, color=color, edgecolors='white', s=50, zorder=5)
 axes[1].set_ylabel('DNA Concentration (ng/µL)')
-axes[1].set_title('DNA Yield by Extraction Kit\n(PowerSoil vs Zymo)')
+axes[1].set_title('DNA Yield by Extraction Kit')
 axes[1].spines['top'].set_visible(False)
 axes[1].spines['right'].set_visible(False)
-kit_sig = f"Mann-Whitney p = {p_kit:.4f}" + (" *" if p_kit < 0.05 else " (ns)")
+kit_sig = kit_test_label
 axes[1].text(0.5, 0.98, kit_sig, transform=axes[1].transAxes,
-             ha='center', va='top', fontsize=9, color='#475569')
+             ha='center', va='top', fontsize=9, color='#475569', wrap=True)
 
 plt.tight_layout()
 plots['dna_groups'] = fig_to_b64(fig)
@@ -556,17 +613,17 @@ Full analysis (Listeria reads, enrichment ratios, AMR genes) will run automatica
 {df_to_html(df_pairwise, 'pairwise-table')}
 <img src="data:image/png;base64,{plots['pairwise']}" alt="Pairwise">
 
-<h2>3. Extraction Kit Comparison — PowerSoil vs Zymo</h2>
-<table>
-<thead><tr><th>Kit</th><th>n</th><th>Median (ng/µL)</th><th>Mean (ng/µL)</th></tr></thead>
-<tbody>
-<tr><td>PowerSoil</td><td>{len(kit_ps)}</td><td>{np.median(kit_ps):.3f}</td><td>{np.mean(kit_ps):.3f}</td></tr>
-<tr><td>Zymo</td><td>{len(kit_zy)}</td><td>{np.median(kit_zy):.3f}</td><td>{np.mean(kit_zy):.3f}</td></tr>
-</tbody>
-</table>
-<p>Mann-Whitney U = {round(u,1)}, p = {round(p_kit,4)} &nbsp;
-<span class="stat-badge {'sig-yes' if p_kit < 0.05 else 'sig-no'}">{'SIGNIFICANT *' if p_kit < 0.05 else 'Not significant'}</span>
-&nbsp; Cohen's d = {d}
+<h2>3. Extraction Kit Summary</h2>
+{df_to_html(df_kit_desc, 'kit-table')}
+<p>{kit_test_label}
+"""
+
+if kit_test_type != 'not_run':
+    html += f""" &nbsp;
+<span class="stat-badge {'sig-yes' if kit_significant else 'sig-no'}">{'SIGNIFICANT *' if kit_significant else 'Not significant'}</span>
+"""
+
+html += f"""
 </p>
 
 <h2>4. DNA Concentration vs Elution Volume</h2>
@@ -614,7 +671,7 @@ with open(txt_path, 'w') as f:
     f.write(f"Kruskal-Wallis: H={kw_results['kruskal']['H']}, p={kw_results['kruskal']['p']}\n\n")
     f.write("PAIRWISE MANN-WHITNEY (Bonferroni-corrected)\n")
     f.write(df_pairwise.to_string(index=False) + "\n\n")
-    f.write(f"Kit comparison: PowerSoil vs Zymo — U={round(u,1)}, p={round(p_kit,4)}, Cohen's d={d}\n")
+    f.write(f"Kit summary: {kit_test_label}\n")
     f.write(f"Volume correlation: Spearman r={round(r,3)}, p={round(p,4)}\n")
 print(f"Text summary: {txt_path}")
 print("\nDone!")

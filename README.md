@@ -40,27 +40,27 @@ graph TD
     classDef optional fill:#eceff1,stroke:#607d8b,stroke-width:2px,stroke-dasharray: 5 5;
 
     %% Nodes
-    A[Raw BAM Files]:::input
-    B[1. Convert BAM to FASTQ]:::process
-    C[2. Adapter Trimming]:::process
-    D[3. Length Filtering >100bp]:::process
-    E[5. Taxonomic Classifier\nKraken2]:::process
-    F[7. Target Extraction\nListeria]:::target
+    A["Raw BAM Files"]:::input
+    B["1. Convert BAM to FASTQ"]:::process
+    C["2. Adapter Trimming"]:::process
+    D["3. Length Filtering >100bp"]:::process
+    E["5. Taxonomic Classifier\nKraken2"]:::process
+    F["7. Target Extraction\nListeria"]:::target
     
     %% Assemblers
     subgraph Assembly
-        G1[Flye]:::process
-        G2[MetaMDBG]:::process
-        G3[Myloasm]:::process
+        G1["Flye"]:::process
+        G2["MetaMDBG"]:::process
+        G3["Myloasm"]:::process
     end
     
-    H[11. AMR Detection\nAMRFinderPlus]:::process
-    I[12-13. Target Contig Extraction]:::target
+    H["11. AMR Detection\nAMRFinderPlus"]:::process
+    I["12-13. Target Contig Extraction"]:::target
     
     %% Reports
-    J[14-16. Compile Overviews]:::process
-    K[17. SLURM HTML Report]:::output
-    L[22. Local Plots & Comparisons]:::optional
+    J["14-16. Compile Overviews"]:::process
+    K["17. SLURM HTML Report"]:::output
+    L["22. Local Plots & Comparisons"]:::optional
     
     %% Edges
     A --> B

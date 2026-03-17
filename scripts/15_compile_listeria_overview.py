@@ -66,9 +66,11 @@ total_reads_data = []
 
 # Try multiple naming patterns — NanoStat output varies
 patterns = [
-    os.path.join(nanostat_dir, 'nanostat_barcode*'),           # renamed by 04_nanostat.sh
+    os.path.join(nanostat_dir, 'nanostat_r*_barcode*'),         # round-prefixed (new naming)
+    os.path.join(nanostat_dir, 'nanostat_barcode*'),            # renamed by 04_nanostat.sh (legacy)
+    os.path.join(nanostat_dir, 'r*_barcode*'),                  # round-prefixed without nanostat_ prefix
     os.path.join(nanostat_dir, 'barcode*NanoStats.txt'),        # NanoStat default name
-    os.path.join(nanostat_dir, 'barcode*'),                     # any barcode file
+    os.path.join(nanostat_dir, 'barcode*'),                     # any barcode file (legacy)
 ]
 
 stat_files = []
@@ -91,8 +93,8 @@ for stat_file in stat_files:
     # Extract sample name: strip 'nanostat_' prefix and file extension
     fname = os.path.basename(stat_file)
     sample = fname.replace('nanostat_', '').replace('NanoStats.txt', '').replace('.txt', '').replace('.tsv', '')
-    # Ensure we have a clean barcode_XX_YY format
-    if not re.match(r'barcode\d+_(AS|N)', sample):
+    # Ensure we have a valid sample name (round-prefixed or legacy format)
+    if not re.match(r'(r\d+_)?barcode\d+_(AS|N)', sample):
         continue
     total_reads = 0
     total_bases = 0
@@ -155,7 +157,8 @@ df = df.fillna(0)
 # Derived columns
 df['pct_listeria'] = np.where(df['total_reads'] > 0,
     (df['listeria_reads'] / df['total_reads'] * 100).round(4), 0)
-df['barcode'] = df['sample'].str.extract(r'(barcode\d+)')[0]
+df['round'] = df['sample'].str.extract(r'^(r\d+)_')[0].fillna('')
+df['barcode'] = df['sample'].str.extract(r'(?:r\d+_)?(barcode\d+)')[0]
 df['barcode_num'] = df['barcode'].str.extract(r'barcode(\d+)')[0].astype(int)
 df['type'] = df['sample'].str.extract(r'barcode\d+_(\w+)')[0]
 
@@ -304,12 +307,9 @@ ax = axes[1]
 pivot_flye_med = df.pivot(index='barcode_num', columns='type', values='flye_median_contig_len').fillna(0).reindex(barcodes)
 pivot_mdbg_med = df.pivot(index='barcode_num', columns='type', values='mdbg_median_contig_len').fillna(0).reindex(barcodes)
 pivot_myloasm_med = df.pivot(index='barcode_num', columns='type', values='myloasm_median_contig_len').fillna(0).reindex(barcodes)
-flye_med = (pivot_flye_med.get('AS', 0) + pivot_flye_med.get('N', 0)) / 2
-mdbg_med = (pivot_mdbg_med.get('AS', 0) + pivot_mdbg_med.get('N', 0)) / 2
-myloasm_med = (pivot_myloasm_med.get('AS', 0) + pivot_myloasm_med.get('N', 0)) / 2
-flye_med = flye_med.replace(0, np.nan)
-mdbg_med = mdbg_med.replace(0, np.nan)
-myloasm_med = myloasm_med.replace(0, np.nan)
+flye_med = pivot_flye_med.max(axis=1).replace(0, np.nan)
+mdbg_med = pivot_mdbg_med.max(axis=1).replace(0, np.nan)
+myloasm_med = pivot_myloasm_med.max(axis=1).replace(0, np.nan)
 ax.bar(x - width3, flye_med, width3, label='Flye+Racon', color=C_FLYE, edgecolor='white', linewidth=0.5)
 ax.bar(x, mdbg_med, width3, label='metaMDBG', color=C_MDBG, edgecolor='white', linewidth=0.5)
 ax.bar(x + width3, myloasm_med, width3, label='Myloasm', color=C_MYLOASM, edgecolor='white', linewidth=0.5)

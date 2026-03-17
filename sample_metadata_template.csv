@@ -1,7 +1,0 @@
-SampleID,Barcode,Condition,Treatment,Replicate,DNA_Conc_ng_ul,Notes
-Sample_A,barcode01,Treatment_1,Drug_X,1,15.2,
-Sample_A,barcode02,Treatment_1,Drug_X,2,14.8,
-Sample_B,barcode03,Control,None,1,35.0,
-Sample_B,barcode04,Control,None,2,33.1,
-Mock_Comm,barcode05,Standard,Zymo_Mock,1,10.0,Positive control
-Blank,barcode06,Standard,Water,1,0.2,Negative control

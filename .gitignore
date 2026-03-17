@@ -1,0 +1,11 @@
+.DS_Store
+__pycache__/
+*.pyc
+backup_csvs/
+downloaded_results/
+scripts_backup/
+cluster_staging/
+report/
+test.html
+old.csv
+listera_3.csv

@@ -1,19 +1,17 @@
 #!/bin/bash
-# Activate conda environment
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate tim
 # -----------------------------------------------------------------------------
 # Step 3b: Build read-length distributions for raw and filtered reads.
 # Input: processing/samtools/<sample>.fastq and processing/nanofilt/filtered_<sample>.fastq
 # Output: processing/read_lengths_raw_agg.tsv and processing/read_lengths_filtered_agg.tsv
 # Run: sbatch --array=1-N --dependency=afterok:<NANOFILT_JOB> scripts/03b_read_lengths.sh
 # -----------------------------------------------------------------------------
-RAW_DIR="/path/to/project/processing/samtools"
-FILT_DIR="/path/to/project/processing/nanofilt"
-WORK_DIR="/path/to/project"
-FILELIST="${WORK_DIR}/filelist.txt"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+source "${SCRIPT_DIR}/pipeline.conf"
+
+RAW_DIR="${WORK_DIR}/processing/samtools"
+FILT_DIR="${WORK_DIR}/processing/nanofilt"
 BAM_FILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$FILELIST")
-BASENAME=$(basename "$BAM_FILE" .bam)
+BASENAME=$(derive_basename "$BAM_FILE")
 RAW_FASTQ="${RAW_DIR}/${BASENAME}.fastq"
 FILT_FASTQ="${FILT_DIR}/filtered_${BASENAME}.fastq"
 echo "Processing: ${BASENAME}"

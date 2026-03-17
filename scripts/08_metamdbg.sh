@@ -1,19 +1,18 @@
 #!/bin/bash
-# Activate conda environment
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate tim
 # -----------------------------------------------------------------------------
 # Step 8: Assemble filtered reads with metaMDBG.
 # Input: processing/nanofilt/filtered_<sample>.fastq
 # Output: processing/mdbg/<sample>/contigs.fasta.gz
 # Run: sbatch --array=1-N scripts/08_metamdbg.sh
 # -----------------------------------------------------------------------------
-INPUT_DIR="/path/to/project/processing/nanofilt"
-OUTPUT_DIR="/path/to/project/processing/mdbg"
-FILELIST="/path/to/project/filelist.txt"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+source "${SCRIPT_DIR}/pipeline.conf"
+
+INPUT_DIR="${WORK_DIR}/processing/nanofilt"
+OUTPUT_DIR="${WORK_DIR}/processing/mdbg"
 # Get the filename for this array task
 BAM_FILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$FILELIST")
-BASENAME=$(basename "$BAM_FILE" .bam)
+BASENAME=$(derive_basename "$BAM_FILE")
 INPUT_FASTQ="${INPUT_DIR}/filtered_${BASENAME}.fastq"
 SAMPLE_OUT="${OUTPUT_DIR}/${BASENAME}"
 if [ ! -f "$INPUT_FASTQ" ]; then

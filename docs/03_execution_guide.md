@@ -22,7 +22,7 @@ Assembly and Kraken2 steps require substantial RAM and CPU processing. Full data
 - `--parsable`: print job ID only (easy for dependency chaining).
 
 ### Running the Orchestrator
-The `submit_pipeline.sh` file manages all dependencies and generates a `filelist.txt` automatically from your inputs.
+The `scripts/submit_pipeline.sh` file manages all dependencies and generates a `filelist.txt` automatically from your inputs.
 
 ```bash
 bash scripts/submit_pipeline.sh

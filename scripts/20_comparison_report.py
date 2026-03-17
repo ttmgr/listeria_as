@@ -44,13 +44,17 @@ plt.rcParams.update({
 # Colors
 C_AS = '#86efac'      # Green (Adaptive Sampling)
 C_N = '#fca5a5'       # Red (Normal)
-C_GROUP_A = '#3b82f6'  # Blue  — Sponge / PowerSoil
-C_GROUP_C = '#f59e0b'  # Amber — Cotton / Zymo
-C_GROUP_D = '#8b5cf6'  # Purple — Zymo / Zymo
-GROUP_COLORS = {'Black_A': C_GROUP_A, 'Black_C': C_GROUP_C, 'Black_D': C_GROUP_D}
+DEFAULT_GROUP_COLORS = {
+    'Black_A': '#3b82f6',
+    'Black_C': '#f59e0b',
+    'Black_D': '#8b5cf6',
+}
+EXTRA_GROUP_COLORS = ['#64748b', '#0f766e', '#b45309', '#be123c']
+PRIMARY_GROUPS = ['Black_A', 'Black_C', 'Black_D']
 
-# Black barcodes only
-BLACK_BARCODES = [3, 4, 5, 6, 7, 14, 15, 16, 18, 19, 26, 27, 28, 29, 30]
+# Black barcodes from the updated metadata sheet.
+# Lm controls are excluded from the cohort comparison.
+BLACK_BARCODES = [6, 7, 8, 9, 10, 16, 17, 18, 19, 20, 26, 27, 28, 29, 30, 34]
 
 base_dir = sys.argv[1]
 out_dir = os.path.join(base_dir, 'processing/report')
@@ -97,13 +101,74 @@ print("Loading sample metadata...")
 meta_path = os.path.join(base_dir, 'sample_metadata.csv')
 df_meta = pd.read_csv(meta_path)
 
+# Standardize column names from metadata builder output
+col_renames = {}
+if 'kit_used' in df_meta.columns and 'kit' not in df_meta.columns:
+    col_renames['kit_used'] = 'kit'
+if 'quantifluor_ng_ul' in df_meta.columns and 'dna_concentration_ng_ul' not in df_meta.columns:
+    col_renames['quantifluor_ng_ul'] = 'dna_concentration_ng_ul'
+if col_renames:
+    df_meta = df_meta.rename(columns=col_renames)
+
+# Ensure barcode is int for filtering
+df_meta['barcode'] = pd.to_numeric(df_meta['barcode'], errors='coerce').astype(int)
+
+# Derive group column (e.g. "Black_A") from label_colour + sample_id prefix
+if 'group' not in df_meta.columns and 'label_colour' in df_meta.columns:
+    df_meta['group'] = df_meta.apply(
+        lambda r: f"{r['label_colour']}_{r['sample_id'][0]}"
+        if pd.notna(r.get('label_colour')) and pd.notna(r.get('sample_id'))
+        else '', axis=1)
+
 # Filter to Black samples only
 df_black = df_meta[df_meta['barcode'].isin(BLACK_BARCODES)].copy()
-# Create filename key: barcode03_AS, barcode03_N, etc.
-df_black['sample'] = df_black.apply(
-    lambda r: f"barcode{r['barcode']:02d}_{r['condition']}", axis=1)
+# Use the basename column from metadata (e.g. r1_barcode06_AS) for matching pipeline outputs
+df_black['sample'] = df_black['basename']
 
 print(f"  Black samples: {len(df_black)} rows ({len(df_black)//2} barcodes × 2 conditions)")
+
+GROUP_COLORS = {}
+for group_name in PRIMARY_GROUPS:
+    if group_name in df_black['group'].dropna().unique():
+        GROUP_COLORS[group_name] = DEFAULT_GROUP_COLORS[group_name]
+extra_groups = sorted(set(df_black['group'].dropna()) - set(GROUP_COLORS))
+for idx, group_name in enumerate(extra_groups):
+    GROUP_COLORS[group_name] = EXTRA_GROUP_COLORS[idx % len(EXTRA_GROUP_COLORS)]
+
+black_barcode_strs = [f'barcode{bc:02d}' for bc in BLACK_BARCODES]
+
+
+def group_label(group_name, compact=False):
+    base = str(group_name).replace('Black_', '')
+    if 'swab_type' not in df_black.columns and 'kit' not in df_black.columns:
+        return base
+
+    sub = df_black[df_black['group'] == group_name]
+    if len(sub) == 0:
+        return base
+
+    parts = []
+    if 'swab_type' in sub.columns:
+        swabs = [str(v) for v in sub['swab_type'].dropna().unique() if str(v).strip()]
+        if swabs:
+            parts.append('/'.join(swabs))
+    if 'kit' in sub.columns:
+        kits = [str(v) for v in sub['kit'].dropna().unique() if str(v).strip()]
+        if kits:
+            parts.append('/'.join(kits))
+
+    if not parts:
+        return base
+
+    sep = '/' if compact else ' / '
+    return f"{base} ({sep.join(parts)})"
+
+
+def group_sample_list(group_name):
+    if 'sample_id' not in df_black.columns:
+        return ''
+    values = [str(v) for v in df_black[df_black['group'] == group_name]['sample_id'].dropna().unique()]
+    return ', '.join(values)
 
 # ============================================================
 # 2. Load Pipeline Outputs
@@ -166,7 +231,9 @@ if len(df_listeria) > 0 and 'sample' in df_listeria.columns:
     listeria_cols = [c for c in df_listeria.columns if c not in df.columns or c == 'sample']
     df = df.merge(df_listeria[listeria_cols], on='sample', how='left')
 
-df = df.fillna(0)
+# Fill numeric columns with 0, leave string columns as-is
+numeric_cols = df.select_dtypes(include='number').columns
+df[numeric_cols] = df[numeric_cols].fillna(0)
 
 # Ensure numeric columns
 for col in ['dna_concentration_ng_ul']:
@@ -189,16 +256,16 @@ for candidate in ['listeria_reads', 'Listeria Reads']:
 if listeria_col:
     df[listeria_col] = pd.to_numeric(df[listeria_col], errors='coerce').fillna(0)
 
-# Compute AS/N enrichment per barcode
+# Compute AS/N enrichment per (round, barcode) pair
 enrichment_rows = []
-for bc in BLACK_BARCODES:
-    as_row = df[(df['barcode'] == bc) & (df['condition'] == 'AS')]
-    n_row = df[(df['barcode'] == bc) & (df['condition'] == 'N')]
+for (rnd, bc), grp_df in df[df['barcode'].isin(BLACK_BARCODES)].groupby(['round', 'barcode']):
+    as_row = grp_df[grp_df['condition'] == 'AS']
+    n_row = grp_df[grp_df['condition'] == 'N']
     if len(as_row) > 0 and len(n_row) > 0:
         as_reads = as_row[listeria_col].values[0] if listeria_col else 0
         n_reads = n_row[listeria_col].values[0] if listeria_col else 0
         abs_diff = as_reads - n_reads
-        ratio = (as_reads / n_reads) if n_reads > 0 else float('inf') if as_reads > 0 else 1.0
+        ratio = (as_reads / n_reads) if n_reads > 0 else np.nan
 
         # Get total reads for relative enrichment
         as_total = 0
@@ -210,7 +277,7 @@ for bc in BLACK_BARCODES:
                 break
         as_pct = (as_reads / as_total * 100) if as_total > 0 else 0
         n_pct = (n_reads / n_total * 100) if n_total > 0 else 0
-        relative_enrichment = (as_pct / n_pct) if n_pct > 0 else float('inf') if as_pct > 0 else 1.0
+        relative_enrichment = (as_pct / n_pct) if n_pct > 0 else np.nan
 
         # Get read length stats
         as_mean_len = 0
@@ -228,6 +295,7 @@ for bc in BLACK_BARCODES:
                 n_median_len = float(n_row[mdl].values[0])
                 break
         enrichment_rows.append({
+            'round': rnd,
             'barcode': bc,
             'sample_id': as_row['sample_id'].values[0],
             'group': as_row['group'].values[0],
@@ -363,7 +431,7 @@ if len(df_enrichment) > 0:
     fig, ax = plt.subplots(figsize=(12, 5))
     df_e = df_enrichment.sort_values(['group', 'barcode'])
     bar_colors = [GROUP_COLORS.get(g, '#999') for g in df_e['group']]
-    bars = ax.bar(range(len(df_e)), df_e['enrichment_ratio'], color=bar_colors, edgecolor='white')
+    bars = ax.bar(range(len(df_e)), df_e['absolute_enrichment'], color=bar_colors, edgecolor='white')
     ax.axhline(y=1.0, color='#94a3b8', linestyle='--', linewidth=1, label='No enrichment (1×)')
     ax.set_xlabel('Sample')
     ax.set_ylabel('Enrichment Ratio (AS / N)')
@@ -376,9 +444,9 @@ if len(df_enrichment) > 0:
 
     # Cap infinite values for display
     for i, (_, row) in enumerate(df_e.iterrows()):
-        if row['enrichment_ratio'] > 100:
-            ax.text(i, min(row['enrichment_ratio'], ax.get_ylim()[1] * 0.9),
-                    f"{row['enrichment_ratio']:.0f}×", ha='center', va='bottom', fontsize=8)
+        if row['absolute_enrichment'] > 100:
+            ax.text(i, min(row['absolute_enrichment'], ax.get_ylim()[1] * 0.9),
+                    f"{row['absolute_enrichment']:.0f}×", ha='center', va='bottom', fontsize=8)
 
     plt.tight_layout()
     plots['enrichment'] = fig_to_b64(fig)
@@ -448,15 +516,15 @@ if len(df_enrichment) > 0:
     for ax_i, (metric, title) in enumerate([('absolute_enrichment', 'Absolute'), ('relative_enrichment', 'Relative')]):
         means = df_enrichment.groupby('group')[metric].apply(lambda x: x.replace([np.inf], np.nan).mean())
         sds = df_enrichment.groupby('group')[metric].apply(lambda x: x.replace([np.inf], np.nan).std())
-        grps = ['Black_A', 'Black_C', 'Black_D']
+        grps = list(GROUP_COLORS)
         vals = [means.get(g, 0) for g in grps]
         errs = [sds.get(g, 0) for g in grps]
         colors = [GROUP_COLORS[g] for g in grps]
-        bars = axes[ax_i].bar(range(3), vals, yerr=errs, color=colors, edgecolor='white',
+        bars = axes[ax_i].bar(range(len(grps)), vals, yerr=errs, color=colors, edgecolor='white',
                                capsize=5, error_kw={'linewidth': 1.5})
         axes[ax_i].axhline(y=1.0, color='#94a3b8', linestyle='--', linewidth=1)
-        axes[ax_i].set_xticks(range(3))
-        axes[ax_i].set_xticklabels(['A (Sponge/PS)', 'C (Cotton/Zymo)', 'D (Zymo/Zymo)'], fontsize=8)
+        axes[ax_i].set_xticks(range(len(grps)))
+        axes[ax_i].set_xticklabels([group_label(g, compact=True) for g in grps], fontsize=8)
         axes[ax_i].set_ylabel(f'{title} Enrichment (×)')
         axes[ax_i].set_title(f'Mean {title} Enrichment by Group')
         axes[ax_i].spines['top'].set_visible(False)
@@ -503,8 +571,7 @@ if reads_col:
                        boxprops=dict(facecolor=color, alpha=0.7),
                        medianprops=dict(color='black', linewidth=2))
     axes[0].set_xticks(range(len(GROUP_COLORS)))
-    axes[0].set_xticklabels([g.replace('Black_', '') + f'\n({df_black[df_black["group"]==g]["swab_type"].values[0]}/{df_black[df_black["group"]==g]["kit"].values[0]})'
-                             for g in GROUP_COLORS.keys()], fontsize=9)
+    axes[0].set_xticklabels([group_label(g, compact=True) for g in GROUP_COLORS], fontsize=9)
     axes[0].set_ylabel('Total Reads')
     axes[0].set_title('Read Yield by Extraction Method')
     axes[0].spines['top'].set_visible(False)
@@ -519,8 +586,7 @@ if reads_col:
                            boxprops=dict(facecolor=color, alpha=0.7),
                            medianprops=dict(color='black', linewidth=2))
         axes[1].set_xticks(range(len(GROUP_COLORS)))
-        axes[1].set_xticklabels([g.replace('Black_', '') + f'\n({df_black[df_black["group"]==g]["swab_type"].values[0]}/{df_black[df_black["group"]==g]["kit"].values[0]})'
-                                 for g in GROUP_COLORS.keys()], fontsize=9)
+        axes[1].set_xticklabels([group_label(g, compact=True) for g in GROUP_COLORS], fontsize=9)
         axes[1].set_ylabel('Listeria Reads')
         axes[1].set_title('Listeria Detection by Extraction Method')
         axes[1].spines['top'].set_visible(False)
@@ -610,22 +676,34 @@ html = f"""<!DOCTYPE html>
         <div class="summary-stats" style="margin-top:1.5rem;">
             <div class="stat-card"><div class="stat-val">{n_samples}</div><div class="stat-label">Samples</div></div>
             <div class="stat-card"><div class="stat-val">{n_samples * 2}</div><div class="stat-label">Sequencing Runs</div></div>
-            <div class="stat-card"><div class="stat-val">3</div><div class="stat-label">Extraction Methods</div></div>
+            <div class="stat-card"><div class="stat-val">{len(GROUP_COLORS)}</div><div class="stat-label">Black Groups</div></div>
             <div class="stat-card"><div class="stat-val">{mean_enrichment:.1f}×</div><div class="stat-label">Mean Enrichment</div></div>
         </div>
     </div>
 """
 
 # --- Section 1: Experimental Design ---
+design_rows = []
+for group_name in GROUP_COLORS:
+    sub = df_black[df_black['group'] == group_name]
+    if len(sub) == 0:
+        continue
+    swabs = ', '.join(str(v) for v in sub['swab_type'].dropna().unique()) if 'swab_type' in sub.columns else '—'
+    kits = ', '.join(str(v) for v in sub['kit'].dropna().unique()) if 'kit' in sub.columns else '—'
+    barcodes = ', '.join(str(v) for v in sorted(sub['barcode'].dropna().unique().tolist()))
+    sample_list = group_sample_list(group_name) or '—'
+    design_rows.append(
+        f'<tr><td><span class="group-tag" style="background:{GROUP_COLORS[group_name]}">{group_name.replace("Black_", "")}</span> '
+        f'{group_label(group_name)}</td><td>{sample_list}</td><td>{swabs}</td><td>{kits}</td><td>{barcodes}</td></tr>'
+    )
+
 html += """
 <div class="section">
 <h2>Experimental Design</h2>
 <table>
 <thead><tr><th>Group</th><th>Samples</th><th>Swab Type</th><th>Extraction Kit</th><th>Barcodes</th></tr></thead>
 <tbody>
-<tr><td><span class="group-tag" style="background:#3b82f6">A</span> Sponge / PowerSoil</td><td>A1–A5</td><td>Sponge</td><td>PowerSoil</td><td>3, 4, 5, 6, 7</td></tr>
-<tr><td><span class="group-tag" style="background:#f59e0b">C</span> Cotton / Zymo</td><td>C1–C5</td><td>Cotton</td><td>Zymo</td><td>14, 15, 16, 18, 19</td></tr>
-<tr><td><span class="group-tag" style="background:#8b5cf6">D</span> Zymo / Zymo</td><td>D1–D5</td><td>Zymo</td><td>Zymo</td><td>26, 27, 28, 29, 30</td></tr>
+""" + '\n'.join(design_rows) + """
 </tbody>
 </table>
 <p>Each sample was sequenced twice: once with <strong>Adaptive Sampling</strong> (AS, Nanopore real-time target enrichment) and once under <strong>Normal</strong> (N, standard) conditions.</p>
@@ -709,11 +787,13 @@ html += '<p>Comparison of sequencing yield and Listeria detection across swab ty
 
 # Summary stats per group
 group_stats = []
-for grp in ['Black_A', 'Black_C', 'Black_D']:
+for grp in GROUP_COLORS:
     sub = df[df['group'] == grp]
+    if len(sub) == 0:
+        continue
     meta_sub = df_black[df_black['group'] == grp].iloc[0]
     stat = {
-        'Group': grp.replace('Black_', ''),
+        'Group': group_label(grp),
         'Swab': meta_sub['swab_type'],
         'Kit': meta_sub['kit'],
         'Mean DNA (ng/µL)': sub['dna_concentration_ng_ul'].mean(),
@@ -739,7 +819,6 @@ html += '<div class="section"><h2>AMR Gene Detection</h2>'
 if len(df_amr_reads) > 0:
     # Filter to Black barcodes
     if 'Barcode' in df_amr_reads.columns:
-        black_barcode_strs = [f'barcode{bc:02d}' for bc in BLACK_BARCODES]
         amr_black = df_amr_reads[df_amr_reads['Barcode'].isin(black_barcode_strs)].copy()
         if len(amr_black) > 0:
             html += '<h3>AMR Genes in Reads (Black Samples)</h3>'

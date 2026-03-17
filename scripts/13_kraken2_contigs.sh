@@ -1,23 +1,21 @@
 #!/bin/bash
-# Activate conda environment
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate tim
 # -----------------------------------------------------------------------------
 # Step 13: Classify assembled contigs with Kraken2.
 # Input: Flye-polished, metaMDBG, and Myloasm contigs
 # Output: processing/kraken2_contigs/<assembler>/classified_*.txt and report_*.txt
 # Run: sbatch --array=1-N --dependency=afterok:<FLYE>:<MDBG>:<MYLOASM> scripts/13_kraken2_contigs.sh
 # -----------------------------------------------------------------------------
-FLYE_DIR="/path/to/project/processing/racon"
-MDBG_DIR="/path/to/project/processing/mdbg"
-MYLOASM_DIR="/path/to/project/processing/myloasm"
-KRAKEN_DB="/lustre/groups/hpc/urban_lab/datasets/ncbi/kraken2_core"
-OUTPUT_DIR="/path/to/project/processing/kraken2_contigs"
-FILELIST="/path/to/project/filelist.txt"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+source "${SCRIPT_DIR}/pipeline.conf"
+
+FLYE_DIR="${WORK_DIR}/processing/racon"
+MDBG_DIR="${WORK_DIR}/processing/mdbg"
+MYLOASM_DIR="${WORK_DIR}/processing/myloasm"
+OUTPUT_DIR="${WORK_DIR}/processing/kraken2_contigs"
 THREADS=20
 mkdir -p "${OUTPUT_DIR}/flye" "${OUTPUT_DIR}/mdbg" "${OUTPUT_DIR}/myloasm"
 BAM_FILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$FILELIST")
-BASENAME=$(basename "$BAM_FILE" .bam)
+BASENAME=$(derive_basename "$BAM_FILE")
 echo "Processing: ${BASENAME}"
 echo "Start time: $(date)"
 # ---- 1. Kraken2 on Flye+Racon polished contigs ----
@@ -27,7 +25,7 @@ if [ -s "$FLYE_CONTIGS" ]; then
         echo "[Flye @ $(date)] Already classified. Skipping."
     else
         echo "[Flye @ $(date)] Running Kraken2 on Flye contigs..."
-        kraken2 --db "$KRAKEN_DB" \
+        kraken2 --db "$KRAKEN2_DB" \
                 --threads $THREADS \
                 --use-names \
                 --output "${OUTPUT_DIR}/flye/classified_flye_${BASENAME}.txt" \
@@ -38,11 +36,11 @@ if [ -s "$FLYE_CONTIGS" ]; then
             echo -e "U\tdummy\t0\t0\t0" > "${OUTPUT_DIR}/flye/classified_flye_${BASENAME}.txt"
             echo -e "100.00\t0\t0\tU\t0\tunclassified" > "${OUTPUT_DIR}/flye/report_flye_${BASENAME}.txt"
         fi
+    fi
     if [ -f "${OUTPUT_DIR}/flye/classified_flye_${BASENAME}.txt" ]; then
         echo "  Done. $(wc -l < ${OUTPUT_DIR}/flye/classified_flye_${BASENAME}.txt) contigs classified"
     else
         echo "  Done. 0 contigs classified (Output empty/missing)."
-    fi
     fi
 else
     echo "WARNING: Flye contigs missing or empty: $FLYE_CONTIGS"
@@ -60,7 +58,7 @@ if [ -s "$MDBG_CONTIGS" ]; then
         echo "[MDBG @ $(date)] Already classified. Skipping."
     else
         echo "[MDBG @ $(date)] Running Kraken2 on mdbg contigs..."
-        kraken2 --db "$KRAKEN_DB" \
+        kraken2 --db "$KRAKEN2_DB" \
                 --threads $THREADS \
                 --use-names \
                 --output "${OUTPUT_DIR}/mdbg/classified_mdbg_${BASENAME}.txt" \
@@ -71,11 +69,11 @@ if [ -s "$MDBG_CONTIGS" ]; then
             echo -e "U\tdummy\t0\t0\t0" > "${OUTPUT_DIR}/mdbg/classified_mdbg_${BASENAME}.txt"
             echo -e "100.00\t0\t0\tU\t0\tunclassified" > "${OUTPUT_DIR}/mdbg/report_mdbg_${BASENAME}.txt"
         fi
+    fi
     if [ -f "${OUTPUT_DIR}/mdbg/classified_mdbg_${BASENAME}.txt" ]; then
         echo "  Done. $(wc -l < ${OUTPUT_DIR}/mdbg/classified_mdbg_${BASENAME}.txt) contigs classified"
     else
         echo "  Done. 0 contigs classified (Output empty/missing)."
-    fi
     fi
 else
     echo "WARNING: MDBG contigs missing or empty for ${BASENAME}"
@@ -87,7 +85,7 @@ if [ -s "$MYLOASM_CONTIGS" ]; then
         echo "[Myloasm @ $(date)] Already classified. Skipping."
     else
         echo "[Myloasm @ $(date)] Running Kraken2 on Myloasm contigs..."
-        kraken2 --db "$KRAKEN_DB" \
+        kraken2 --db "$KRAKEN2_DB" \
                 --threads $THREADS \
                 --use-names \
                 --output "${OUTPUT_DIR}/myloasm/classified_myloasm_${BASENAME}.txt" \
@@ -98,11 +96,11 @@ if [ -s "$MYLOASM_CONTIGS" ]; then
             echo -e "U\tdummy\t0\t0\t0" > "${OUTPUT_DIR}/myloasm/classified_myloasm_${BASENAME}.txt"
             echo -e "100.00\t0\t0\tU\t0\tunclassified" > "${OUTPUT_DIR}/myloasm/report_myloasm_${BASENAME}.txt"
         fi
+    fi
     if [ -f "${OUTPUT_DIR}/myloasm/classified_myloasm_${BASENAME}.txt" ]; then
         echo "  Done. $(wc -l < ${OUTPUT_DIR}/myloasm/classified_myloasm_${BASENAME}.txt) contigs classified"
     else
         echo "  Done. 0 contigs classified (Output empty/missing)."
-    fi
     fi
 else
     echo "WARNING: Myloasm contigs missing or empty for ${BASENAME}"

@@ -18,24 +18,19 @@
 #   bash scripts/09b_dorado_polish.sh
 # ============================================================
 
-# --- Conda ---
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate listeria_as
+# --- Config ---
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+source "${SCRIPT_DIR}/pipeline.conf"
 
-# --- Paths (edit these) ---
-PROJECT="/path/to/project"
-FILELIST="${PROJECT}/filelist.txt"
-READS_DIR="${PROJECT}/processing/nanofilt"
-ASSEMBLY_BASE="${PROJECT}/processing/assemblies"
+READS_DIR="${WORK_DIR}/processing/nanofilt"
 THREADS="${SLURM_CPUS_PER_TASK:-8}"
 
 # --- Dorado Models ---
-# Point this to where you ran `dorado download --model all`
-export DORADO_MODELS_DIRECTORY="/path/to/my/dorado_models"
+export DORADO_MODELS_DIRECTORY="${DORADO_MODELS_DIR}"
 
 # --- Resolve sample ID from filelist ---
 BAM_PATH=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$FILELIST")
-ID=$(basename "$BAM_PATH" .bam)
+ID=$(derive_basename "$BAM_PATH")
 
 echo "=============================="
 echo "  Dorado Polish: ${ID}"
@@ -43,12 +38,15 @@ echo "  Threads: ${THREADS}"
 echo "=============================="
 
 # Input reads (filtered FASTQ from step 3)
-READS="${READS_DIR}/${ID}.fastq.gz"
+READS="${READS_DIR}/filtered_${ID}.fastq"
 
 if [ ! -f "$READS" ]; then
     echo "ERROR: Filtered reads not found: $READS"
     exit 1
 fi
+
+# Output base directory for polished assemblies
+POLISH_BASE="${WORK_DIR}/processing/assemblies"
 
 # --- Loop over assemblers ---
 for ASSEMBLER in flye mdbg myloasm; do
@@ -56,20 +54,26 @@ for ASSEMBLER in flye mdbg myloasm; do
     echo ""
     echo "--- Assembler: ${ASSEMBLER} ---"
 
-    # Locate the draft assembly
+    # Locate the draft assembly (matching actual output paths from steps 8, 8b, 9)
     case "$ASSEMBLER" in
         flye)
-            DRAFT="${ASSEMBLY_BASE}/flye/${ID}/assembly.fasta"
+            DRAFT="${WORK_DIR}/processing/racon/polished_${ID}.fasta"
             ;;
         mdbg)
-            DRAFT="${ASSEMBLY_BASE}/mdbg/${ID}/contigs.fasta"
+            # metaMDBG outputs .fasta.gz — decompress if needed
+            MDBG_GZ="${WORK_DIR}/processing/mdbg/${ID}/contigs.fasta.gz"
+            DRAFT="${WORK_DIR}/processing/mdbg/${ID}/contigs.fasta"
+            if [ -s "$MDBG_GZ" ] && [ ! -f "$DRAFT" ]; then
+                echo "  Decompressing metaMDBG contigs..."
+                gunzip -k "$MDBG_GZ"
+            fi
             ;;
         myloasm)
-            DRAFT="${ASSEMBLY_BASE}/myloasm/${ID}/assembly.fasta"
+            DRAFT="${WORK_DIR}/processing/myloasm/${ID}/assembly_primary.fa"
             ;;
     esac
 
-    OUTDIR="${ASSEMBLY_BASE}/${ASSEMBLER}_polished/${ID}"
+    OUTDIR="${POLISH_BASE}/${ASSEMBLER}_polished/${ID}"
     ALIGNED="${OUTDIR}/aligned_reads.bam"
     POLISHED="${OUTDIR}/polished_assembly.fasta"
 

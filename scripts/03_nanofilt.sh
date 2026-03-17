@@ -1,20 +1,19 @@
 #!/bin/bash
-# Activate conda environment
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate tim
 # -----------------------------------------------------------------------------
 # Step 3: Remove short reads (<100 bp) after adapter trimming.
 # Input: processing/porechop/trimmed_<sample>.fastq
 # Output: processing/nanofilt/filtered_<sample>.fastq
 # Run: sbatch --array=1-N --dependency=afterok:<JOB2_ID> scripts/03_nanofilt.sh
 # -----------------------------------------------------------------------------
-INPUT_DIR="/path/to/project/processing/porechop"
-OUTPUT_DIR="/path/to/project/processing/nanofilt"
-FILELIST="/path/to/project/filelist.txt"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+source "${SCRIPT_DIR}/pipeline.conf"
+
+INPUT_DIR="${WORK_DIR}/processing/porechop"
+OUTPUT_DIR="${WORK_DIR}/processing/nanofilt"
 mkdir -p "$OUTPUT_DIR"
 # Get the filename for this array task
 BAM_FILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$FILELIST")
-BASENAME=$(basename "$BAM_FILE" .bam)
+BASENAME=$(derive_basename "$BAM_FILE")
 INPUT_FASTQ="${INPUT_DIR}/trimmed_${BASENAME}.fastq"
 if [ ! -f "$INPUT_FASTQ" ]; then
     echo "ERROR: Input file $INPUT_FASTQ does not exist. Skipping."

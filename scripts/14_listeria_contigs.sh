@@ -1,22 +1,22 @@
 #!/bin/bash
-# Activate conda environment
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate tim
 # -----------------------------------------------------------------------------
 # Step 14: Extract contigs classified as Listeria and summarize contig metrics.
 # Input: Kraken2 contig classification files and assembly FASTA files
 # Output: Listeria-only contigs plus processing/listeria/listeria_contigs_summary.tsv
 # Run: sbatch --array=1-N --dependency=afterok:<KRAKEN_CONTIGS> scripts/14_listeria_contigs.sh
 # -----------------------------------------------------------------------------
-KRAKEN_CONTIG_DIR="/path/to/project/processing/kraken2_contigs"
-FLYE_DIR="/path/to/project/processing/racon"
-MDBG_DIR="/path/to/project/processing/mdbg"
-MYLOASM_DIR="/path/to/project/processing/myloasm"
-OUTPUT_DIR="/path/to/project/processing/listeria"
-FILELIST="/path/to/project/filelist.txt"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+source "${SCRIPT_DIR}/pipeline.conf"
+
+KRAKEN_CONTIG_DIR="${WORK_DIR}/processing/kraken2_contigs"
+FLYE_DIR="${WORK_DIR}/processing/racon"
+MDBG_DIR="${WORK_DIR}/processing/mdbg"
+MYLOASM_DIR="${WORK_DIR}/processing/myloasm"
+OUTPUT_DIR="${WORK_DIR}/processing/listeria"
+SUMMARY_FILE="${OUTPUT_DIR}/listeria_contigs_summary.tsv"
 mkdir -p "${OUTPUT_DIR}/contigs_flye" "${OUTPUT_DIR}/contigs_mdbg" "${OUTPUT_DIR}/contigs_myloasm"
 BAM_FILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$FILELIST")
-BASENAME=$(basename "$BAM_FILE" .bam)
+BASENAME=$(derive_basename "$BAM_FILE")
 echo "Processing: ${BASENAME}"
 echo "Start time: $(date)"
 # Function to extract Listeria contigs and compute stats
@@ -32,7 +32,10 @@ extract_listeria_contigs() {
     fi
     if [ ! -s "$classification" ]; then
         echo "  No Kraken2 file for ${source}. Skipping."
-        echo -e "${BASENAME}\t${source}\t0\t0\t0\t0" >> "${OUTPUT_DIR}/listeria_contigs_summary.tsv"
+        (
+            flock -x 200
+            echo -e "${BASENAME}\t${source}\t0\t0\t0\t0" >> "$SUMMARY_FILE"
+        ) 200>"${SUMMARY_FILE}.lock"
         return
     fi
     # Extract contig IDs classified as Listeria
@@ -45,20 +48,35 @@ extract_listeria_contigs() {
         # We use split() on the FASTA header to extract just the first word (the ID)
         awk 'NR==FNR{ids[$1]; next} /^>/{split($1, a, " "); name=substr(a[1], 2); p=(name in ids)} p' \
             "$ID_FILE" "$asm_fasta" > "$out_fasta"
-        # Compute contig stats
+        # Compute contig stats — accumulate sequence per contig (handles wrapped FASTA)
         local TOTAL_BASES=$(awk '!/^>/{sum += length($0)} END {print sum+0}' "$out_fasta")
-        local MEDIAN_LEN=$(awk '!/^>/{lens[++n] = length($0)} END {
-            if(n==0) {print 0; exit}
-            asort(lens);
-            if(n%2==1) {print lens[int(n/2)+1]}
-            else {printf "%.0f", (lens[n/2] + lens[n/2+1]) / 2}
-        }' "$out_fasta")
+        local MEDIAN_LEN=$(awk '
+            /^>/ { if (seq != "") lens[++n] = length(seq); seq = ""; next }
+            { seq = seq $0 }
+            END {
+                if (seq != "") lens[++n] = length(seq)
+                if (n == 0) { print 0; exit }
+                # Simple insertion sort for small arrays
+                for (i = 2; i <= n; i++) {
+                    key = lens[i]; j = i - 1
+                    while (j >= 1 && lens[j] > key) { lens[j+1] = lens[j]; j-- }
+                    lens[j+1] = key
+                }
+                if (n % 2 == 1) print lens[int(n/2)+1]
+                else printf "%.0f\n", (lens[n/2] + lens[n/2+1]) / 2
+            }
+        ' "$out_fasta")
         local TOTAL_CONTIGS=$(grep -c "^>" "$out_fasta" || echo 0)
         echo "  ${source}: ${TOTAL_CONTIGS} contigs, ${TOTAL_BASES} bases, median ${MEDIAN_LEN} bp"
-        echo -e "${BASENAME}\t${source}\t${TOTAL_CONTIGS}\t${TOTAL_BASES}\t${MEDIAN_LEN}\t${CONTIG_COUNT}" \
-            >> "${OUTPUT_DIR}/listeria_contigs_summary.tsv"
+        (
+            flock -x 200
+            echo -e "${BASENAME}\t${source}\t${TOTAL_CONTIGS}\t${TOTAL_BASES}\t${MEDIAN_LEN}\t${CONTIG_COUNT}" >> "$SUMMARY_FILE"
+        ) 200>"${SUMMARY_FILE}.lock"
     else
-        echo -e "${BASENAME}\t${source}\t0\t0\t0\t0" >> "${OUTPUT_DIR}/listeria_contigs_summary.tsv"
+        (
+            flock -x 200
+            echo -e "${BASENAME}\t${source}\t0\t0\t0\t0" >> "$SUMMARY_FILE"
+        ) 200>"${SUMMARY_FILE}.lock"
     fi
 }
 # ---- Flye ----

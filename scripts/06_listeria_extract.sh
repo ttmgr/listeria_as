@@ -1,21 +1,20 @@
 #!/bin/bash
-# Activate conda environment
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate tim
 # -----------------------------------------------------------------------------
 # Step 6: Pull out reads classified as Listeria and summarize them.
 # Input: filtered FASTQ and Kraken2 read classification for each sample
 # Output: Listeria-only FASTQ, read ID list, per-sample summary rows
 # Run: sbatch --array=1-N --dependency=afterok:<KRAKEN_JOB_ID> scripts/06_listeria_extract.sh
 # -----------------------------------------------------------------------------
-INPUT_FASTQ_DIR="/path/to/project/processing/nanofilt"
-KRAKEN_DIR="/path/to/project/processing/kraken2"
-OUTPUT_DIR="/path/to/project/processing/listeria"
-FILELIST="/path/to/project/filelist.txt"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+source "${SCRIPT_DIR}/pipeline.conf"
+
+INPUT_FASTQ_DIR="${WORK_DIR}/processing/nanofilt"
+KRAKEN_DIR="${WORK_DIR}/processing/kraken2"
+OUTPUT_DIR="${WORK_DIR}/processing/listeria"
 mkdir -p "$OUTPUT_DIR"
 # Get the filename for this array task
 BAM_FILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$FILELIST")
-BASENAME=$(basename "$BAM_FILE" .bam)
+BASENAME=$(derive_basename "$BAM_FILE")
 INPUT_FASTQ="${INPUT_FASTQ_DIR}/filtered_${BASENAME}.fastq"
 KRAKEN_OUTPUT="${KRAKEN_DIR}/classified_${BASENAME}.txt"
 KRAKEN_REPORT="${KRAKEN_DIR}/report_${BASENAME}.txt"

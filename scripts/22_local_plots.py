@@ -22,36 +22,39 @@ from matplotlib.backends.backend_pdf import PdfPages
 # CONFIG
 # ============================================================
 
+# The updated metadata includes controls in the high barcodes.
 COLOUR_GROUPS = {
     'Black': {
         'title': 'Black Samples',
-        'barcodes': [3,4,5,6,7, 14,15,16,18,19, 26,27,28,29,30],
-        'sample_map': {3:'A1',4:'A2',5:'A3',6:'A4',7:'A5',
-                       14:'C1',15:'C2',16:'C3',18:'C4',19:'C5',
-                       26:'D1',27:'D2',28:'D3',29:'D4',30:'D5'},
+        'barcodes': [6,7,8,9,10, 16,17,18,19,20, 26,27,28,29,30, 34],
+        'sample_map': {6:'A1',7:'A2',8:'A3',9:'A4',10:'A5',
+                       16:'C1',17:'C2',18:'C3',19:'C4',20:'C5',
+                       26:'D1',27:'D2',28:'D3',29:'D4',30:'D5',
+                       34:'A3b'},
         'outdir': 'plots_black',
     },
     'Blue': {
         'title': 'Blue Samples',
-        'barcodes': [1,2,9,17,25, 8,10,11,12,13, 20,21,22,23,24],
-        'sample_map': {1:'A1',2:'A5',9:'A2',17:'A3',25:'A4',
-                       8:'C1',10:'C2',11:'C3',12:'C4',13:'C5',
-                       20:'D1',21:'D2',22:'D3',23:'D4',24:'D5'},
+        'barcodes': [1,2,3,4,5, 11,12,13,14,15, 21,22,23,24,25, 33],
+        'sample_map': {1:'A1',2:'A2',3:'A3',4:'A4',5:'A5',
+                       11:'C1',12:'C2',13:'C3',14:'C4',15:'C5',
+                       21:'D1',22:'D2',23:'D3',24:'D4',25:'D5',
+                       33:'A3b'},
         'outdir': 'plots_blue',
     },
 }
-LM_BARCODES = [31,32,33]
-LM_MAP = {31:'Lm2',32:'Lm4',33:'Lm6'}
+LM_BARCODES = [31,32]
+LM_MAP = {31:'Lm2',32:'Lm2b'}
 
 METHOD_MAP = {
-    1:'A',2:'A',3:'A',4:'A',5:'A',6:'A',7:'A',9:'A',17:'A',25:'A',
-    8:'C',10:'C',11:'C',12:'C',13:'C',14:'C',15:'C',16:'C',18:'C',19:'C',
-    20:'D',21:'D',22:'D',23:'D',24:'D',26:'D',27:'D',28:'D',29:'D',30:'D',
-    31:'Lm',32:'Lm',33:'Lm',
+    1:'A',2:'A',3:'A',4:'A',5:'A',6:'A',7:'A',8:'A',9:'A',10:'A',
+    11:'C',12:'C',13:'C',14:'C',15:'C',16:'C',17:'C',18:'C',19:'C',20:'C',
+    21:'D',22:'D',23:'D',24:'D',25:'D',26:'D',27:'D',28:'D',29:'D',30:'D',
+    31:'Lm',32:'Lm',33:'A',34:'A',
 }
 
 METHODS = ['A','C','D']
-METHOD_FULL = {'A':'Sponge / PowerSoil','C':'Cotton / Zymo','D':'Zymo swab / Zymo','Lm':'Lm control / Zymo'}
+METHOD_FULL = {'A':'Sponge / Mini','C':'Cotton / Mini','D':'Zymo / Mini','Lm':'Lm control / Mini'}
 
 # N = solid (velvet red), AS = hatched (velvet green)
 C_N       = '#b03060'
@@ -76,7 +79,7 @@ plt.rcParams.update({
 # ============================================================
 
 def bc_num(name):
-    m = re.search(r'barcode(\d+)', str(name))
+    m = re.search(r'(?:r\d+_)?barcode(\d+)', str(name))
     return int(m.group(1)) if m else 0
 
 def cond(name):
@@ -111,7 +114,7 @@ def enrich_all(df, scol='Sample'):
     df['bc'] = df[scol].apply(bc_num)
     df['cond'] = df[scol].apply(cond)
     df['method'] = df['bc'].map(METHOD_MAP)
-    return df[(df['bc']>=1) & (df['bc']<=33)].copy()
+    return df[(df['bc']>=1) & (df['bc']<=34)].copy()
 
 def add_seps(ax, bcs, key_fn):
     prev = None
@@ -154,7 +157,7 @@ df_ay = try_load(bd, 'processing/report/assembly_stats_myloasm.csv')
 df_rl = try_load(bd, 'processing/read_lengths_filtered_agg.tsv', sep='\t', hdr=False)
 if df_rl is not None:
     df_rl.columns = ['sample','length','state','count']
-    df_rl = df_rl[df_rl['sample'].str.match(r'^barcode\d{2}_(AS|N)$', na=False)].copy()
+    df_rl = df_rl[df_rl['sample'].str.match(r'^(?:r\d+_)?barcode\d{2}_(AS|N)$', na=False)].copy()
     df_rl['length'] = pd.to_numeric(df_rl['length'], errors='coerce')
     df_rl['count']  = pd.to_numeric(df_rl['count'], errors='coerce')
     df_rl = df_rl.dropna(subset=['length','count'])
@@ -187,8 +190,8 @@ for colour, cfg in COLOUR_GROUPS.items():
     out = os.path.join(bd, cfg['outdir'])
     os.makedirs(out, exist_ok=True)
 
-    # Include Lm controls alongside each group
-    all_bcs = barcodes + LM_BARCODES
+    # Keep cohort-specific extras in the configured barcode list and deduplicate once.
+    all_bcs = list(dict.fromkeys(barcodes + LM_BARCODES))
     full_smap = {**smap, **LM_MAP}
 
     def slabel(bc):
@@ -446,8 +449,8 @@ for colour, cfg in COLOUR_GROUPS.items():
         kp = os.path.join(out, 'kraken2_taxonomy.csv')
         k2_out.to_csv(kp, index=False)
         print(f"  Saved: {os.path.basename(kp)} ({len(k2_out)} rows)")
-        k2_top = k2_out.groupby(['sample','condition']).apply(
-            lambda x: x.nlargest(10, 'reads'), include_groups=False
+        k2_top = k2_out.groupby(['sample','condition'], group_keys=False).apply(
+            lambda x: x.nlargest(10, 'reads')
         ).reset_index(drop=True)
         k2_top.to_csv(os.path.join(out, 'kraken2_top10.csv'), index=False)
     else:

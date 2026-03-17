@@ -1,24 +1,23 @@
 #!/bin/bash
-# Activate conda environment
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate tim
 # -----------------------------------------------------------------------------
 # Step 11: Screen reads and contigs for AMR/virulence markers with AMRFinderPlus.
 # Input: FASTA reads plus Flye, metaMDBG, and Myloasm assemblies
 # Output: processing/amrfinder/{reads,flye,mdbg,myloasm}/amrfinder_*.tsv
 # Run: sbatch --array=1-N --dependency=afterok:<SEQKIT>:<FLYE>:<MDBG>:<MYLOASM> scripts/11_amrfinderplus.sh
 # -----------------------------------------------------------------------------
-READS_DIR="/path/to/project/processing/fasta"
-FLYE_DIR="/path/to/project/processing/racon"
-MDBG_DIR="/path/to/project/processing/mdbg"
-MYLOASM_DIR="/path/to/project/processing/myloasm"
-OUTPUT_DIR="/path/to/project/processing/amrfinder"
-FILELIST="/path/to/project/filelist.txt"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+source "${SCRIPT_DIR}/pipeline.conf"
+
+READS_DIR="${WORK_DIR}/processing/fasta"
+FLYE_DIR="${WORK_DIR}/processing/racon"
+MDBG_DIR="${WORK_DIR}/processing/mdbg"
+MYLOASM_DIR="${WORK_DIR}/processing/myloasm"
+OUTPUT_DIR="${WORK_DIR}/processing/amrfinder"
 THREADS=8
 mkdir -p "${OUTPUT_DIR}/reads" "${OUTPUT_DIR}/flye" "${OUTPUT_DIR}/mdbg" "${OUTPUT_DIR}/myloasm"
 # Get the filename for this array task
 BAM_FILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$FILELIST")
-BASENAME=$(basename "$BAM_FILE" .bam)
+BASENAME=$(derive_basename "$BAM_FILE")
 echo "Processing: ${BASENAME}"
 echo "Start time: $(date)"
 # ---- 1. AMRFinderPlus on reads (FASTA) ----

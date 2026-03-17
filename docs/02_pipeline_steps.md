@@ -7,13 +7,13 @@ The workflow consists of modular scripts located in the `scripts/` directory.
 | Step | Script | Function |
 | :--- | :--- | :--- |
 | **1.** | `01_samtools_bam2fastq.sh` | Converts basecalled `.bam` to `.fastq.gz` |
-| **2.** | `02_porechop.sh` | adapter trimming |
-| **3.** | `03_nanofilt.sh` | length filtering (`<100 bp` removed) |
+| **2.** | `02_porechop.sh` | Adapter trimming |
+| **3.** | `03_nanofilt.sh` | Length filtering (`<100 bp` removed) |
 | **4.** | `03b_read_lengths.sh` | Extrapolates read-length distributions |
 | **5.** | `04_nanostat.sh` | Generates QC metrics per sample |
 | **6.** | `05_kraken2.sh` | Taxonomic classification on all reads |
 | **7.** | `06_listeria_extract.sh` | Extracts target reads (e.g., *Listeria*) and compiles per-sample summaries |
-| **8.** | `07_compile_stats.sh` | Compile read and Target summary tables |
+| **8.** | `07_compile_stats.sh` | Compiles read and Target summary tables |
 | **9.** | `08_metamdbg.sh`, `08b_myloasm.sh`, `09_metaflye.sh` | Assembly workflows using 3 distinct long-read assemblers |
 | **9b.**| `09b_dorado_polish.sh` | Aligns reads back to draft assemblies with `dorado aligner`, then polishes with `dorado polish --bacteria` |
 | **10.**| `10_seqkit_fq2fa.sh` | FASTQ to FASTA conversion for reads |
@@ -27,7 +27,7 @@ The workflow consists of modular scripts located in the `scripts/` directory.
 | **18.**| `20_comparison_report.sh` | Dedicated AS vs N comparative report (optional) |
 
 ### Optional Downstream Visualizations/Exports
-- `19_reads_report.sh`: read-focused quick report
+- `19_reads_report.sh`: Read-focused quick report
 - `21_statistical_analysis.py`: statistical testing
 - `22_local_plots.py`: Local publication-style figure generation (run this on your laptop!)
 - `20_export_tables_to_xlsx.py`, `21_kraken2_to_spreadsheets.py`: Spreadsheet exports

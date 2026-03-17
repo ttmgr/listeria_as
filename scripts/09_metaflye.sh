@@ -1,23 +1,22 @@
 #!/bin/bash
-# Activate conda environment
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate tim
 # -----------------------------------------------------------------------------
 # Step 9: Assemble with Flye, map reads back, then polish with Racon.
 # Input: processing/nanofilt/filtered_<sample>.fastq
 # Output: processing/racon/polished_<sample>.fasta and sorted BAM alignment
 # Run: sbatch --array=1-N scripts/09_metaflye.sh
 # -----------------------------------------------------------------------------
-INPUT_DIR="/path/to/project/processing/nanofilt"
-FLYE_DIR="/path/to/project/processing/flye"
-MINIMAP_DIR="/path/to/project/processing/minimap2"
-SAMTOOLS_DIR="/path/to/project/processing/samtools_bam"
-RACON_DIR="/path/to/project/processing/racon"
-FILELIST="/path/to/project/filelist.txt"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+source "${SCRIPT_DIR}/pipeline.conf"
+
+INPUT_DIR="${WORK_DIR}/processing/nanofilt"
+FLYE_DIR="${WORK_DIR}/processing/flye"
+MINIMAP_DIR="${WORK_DIR}/processing/minimap2"
+SAMTOOLS_DIR="${WORK_DIR}/processing/samtools_bam"
+RACON_DIR="${WORK_DIR}/processing/racon"
 THREADS=20
 # Get the filename for this array task
 BAM_FILE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$FILELIST")
-BASENAME=$(basename "$BAM_FILE" .bam)
+BASENAME=$(derive_basename "$BAM_FILE")
 INPUT_FASTQ="${INPUT_DIR}/filtered_${BASENAME}.fastq"
 if [ ! -f "$INPUT_FASTQ" ]; then
     echo "ERROR: Input file $INPUT_FASTQ does not exist. Skipping."
@@ -46,7 +45,7 @@ else
     echo "[Step 2 @ $(date)] Running minimap2..."
     minimap2 -ax map-ont -t $THREADS "$ASSEMBLY" "$INPUT_FASTQ" > "$SAM_FILE"
     # Step 3: SAM to sorted BAM
-    echo "[Step 3 @ $(date)] Converting SAM → sorted BAM..."
+    echo "[Step 3 @ $(date)] Converting SAM -> sorted BAM..."
     samtools view -b -@ $THREADS "$SAM_FILE" | samtools sort -@ $THREADS -o "$BAM_SORTED"
     samtools index "$BAM_SORTED"
     # Step 4: Racon polishing
