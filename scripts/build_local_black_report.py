@@ -388,6 +388,12 @@ def compute_enrichment(listeria: pd.DataFrame) -> pd.DataFrame:
                 "relative_enrichment": rel_enr,
             }
         )
+    if not rows:
+        return pd.DataFrame(columns=[
+            "barcode", "sample_id", "group", "method", "swab_type", "kit",
+            "dna_ng_ul", "listeria_AS", "listeria_N", "pct_AS", "pct_N",
+            "total_reads_AS", "total_reads_N", "absolute_enrichment", "relative_enrichment",
+        ])
     return pd.DataFrame(rows).sort_values("barcode")
 
 
