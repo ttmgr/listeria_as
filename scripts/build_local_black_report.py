@@ -217,6 +217,8 @@ def load_inputs(base_dir: Path) -> Dict[str, pd.DataFrame]:
         }
     )
     listeria["barcode"] = listeria["sample"].map(barcode_num)
+    if "round" in listeria.columns:
+        listeria["round"] = listeria["round"].astype(str).str.replace(r"^r", "", regex=True).astype(int)
     data["listeria"] = listeria
 
     read_lengths_path = base_dir / "processing" / "read_lengths_filtered_agg_rebuilt.tsv"
@@ -257,18 +259,42 @@ def load_inputs(base_dir: Path) -> Dict[str, pd.DataFrame]:
     for name in ["flye", "mdbg", "myloasm"]:
         path = base_dir / "processing" / "kraken2_csv" / f"{name}_contigs_classification.csv"
         if path.exists():
-            contig_frames.append(pd.read_csv(path))
+            df = pd.read_csv(path)
+            df["assembler"] = name
+            contig_frames.append(df)
     data["contig_taxa"] = pd.concat(contig_frames, ignore_index=True) if contig_frames else pd.DataFrame()
+
+    reads_taxa_path = base_dir / "processing" / "kraken2_csv" / "reads_classification.csv"
+    if reads_taxa_path.exists():
+        data["read_taxa"] = pd.read_csv(reads_taxa_path)
+    else:
+        print(f"WARNING: Read-level kraken2 CSV not found: {reads_taxa_path}")
+        data["read_taxa"] = pd.DataFrame()
+
     return data
 
 
 def prepare_cohort_tables(data: Dict[str, pd.DataFrame], cohort: str) -> Dict[str, pd.DataFrame]:
-    meta = data["meta"][data["meta"]["cohort"].eq(cohort)].copy()
+    all_meta = data["meta"][data["meta"]["cohort"].eq(cohort)].copy()
+    all_meta = all_meta.drop_duplicates(subset=["sample"], keep="first")
+
+    # Separate controls (Control_Lm) from experimental samples
+    ctrl_meta = all_meta[all_meta["group"].eq("Control_Lm")].copy()
+    meta = all_meta[~all_meta["group"].eq("Control_Lm")].copy()
+
     group_labels = build_group_labels(meta)
     meta["group_label"] = meta["group"].map(group_labels).fillna(meta["group"])
     meta["Barcode"] = meta["barcode"].map(lambda x: f"barcode{int(x):02d}")
     meta["Type"] = meta["condition"]
     keep_samples = set(meta["sample"])
+
+    # Prepare control metadata the same way
+    if not ctrl_meta.empty:
+        ctrl_labels = build_group_labels(ctrl_meta)
+        ctrl_meta["group_label"] = ctrl_meta["group"].map(ctrl_labels).fillna(ctrl_meta["group"])
+        ctrl_meta["Barcode"] = ctrl_meta["barcode"].map(lambda x: f"barcode{int(x):02d}")
+        ctrl_meta["Type"] = ctrl_meta["condition"]
+    ctrl_samples = set(ctrl_meta["sample"])
 
     listeria = data["listeria"][data["listeria"]["sample"].isin(keep_samples)].copy()
     listeria = listeria.merge(
@@ -318,6 +344,47 @@ def prepare_cohort_tables(data: Dict[str, pd.DataFrame], cohort: str) -> Dict[st
         contig_taxa = contig_taxa[contig_taxa["sample"].isin(keep_samples)].copy()
         contig_taxa = contig_taxa.merge(meta[["sample", "barcode", "condition", "group", "group_label"]], on="sample", how="left")
 
+    # Build control listeria table
+    ctrl_listeria = pd.DataFrame()
+    if not ctrl_meta.empty and ctrl_samples:
+        ctrl_listeria = data["listeria"][data["listeria"]["sample"].isin(ctrl_samples)].copy()
+        if not ctrl_listeria.empty:
+            ctrl_listeria = ctrl_listeria.merge(
+                ctrl_meta[["sample", "sample_id", "barcode", "condition", "group", "group_label", "swab_type", "kit", "dna_concentration_ng_ul"]],
+                on=["sample", "barcode", "condition"],
+                how="left",
+            )
+
+    # Build combined contig taxa with full metadata (experimental + controls)
+    all_samples = keep_samples | ctrl_samples
+    combined_taxa = data["contig_taxa"].copy()
+    if not combined_taxa.empty:
+        combined_taxa = combined_taxa[combined_taxa["sample"].isin(all_samples)].copy()
+        combined_meta = pd.concat([meta, ctrl_meta], ignore_index=True)
+        combined_taxa = combined_taxa.merge(
+            combined_meta[["sample", "barcode", "condition", "group", "group_label"]].rename(
+                columns={"group_label": "cohort_group"}
+            ),
+            on="sample",
+            how="left",
+        )
+        combined_taxa["cohort"] = cohort
+
+    # Build combined read taxa with full metadata (experimental + controls)
+    combined_read_taxa = data["read_taxa"].copy() if not data["read_taxa"].empty else pd.DataFrame()
+    if not combined_read_taxa.empty:
+        combined_read_taxa = combined_read_taxa[combined_read_taxa["sample"].isin(all_samples)].copy()
+        combined_meta = pd.concat([meta, ctrl_meta], ignore_index=True) if not combined_read_taxa.empty else pd.DataFrame()
+        if not combined_read_taxa.empty and not combined_meta.empty:
+            combined_read_taxa = combined_read_taxa.merge(
+                combined_meta[["sample", "barcode", "condition", "group", "group_label"]].rename(
+                    columns={"group_label": "cohort_group"}
+                ),
+                on="sample",
+                how="left",
+            )
+            combined_read_taxa["cohort"] = cohort
+
     return {
         "meta": meta,
         "listeria": listeria,
@@ -326,6 +393,9 @@ def prepare_cohort_tables(data: Dict[str, pd.DataFrame], cohort: str) -> Dict[st
         "amr_contigs": amr_contigs,
         "assembly": asm,
         "contig_taxa": contig_taxa,
+        "ctrl_listeria": ctrl_listeria,
+        "combined_taxa": combined_taxa,
+        "combined_read_taxa": combined_read_taxa,
         "cohort": cohort,
         "cohort_slug": cohort_slug(cohort),
         "group_labels": group_labels,
@@ -424,7 +494,7 @@ def build_general_metrics(listeria: pd.DataFrame, read_metrics: pd.DataFrame, co
 def section_plot_read_lengths_all(rl: pd.DataFrame, out_assets: Path, cohort: str) -> Tuple[List[str], pd.DataFrame]:
     files = []
     max_len = int(rl["length"].max())
-    bins = np.logspace(np.log10(50), np.log10(max(max_len, 100000)), 101)
+    bins = np.logspace(0, np.log10(max(max_len, 100000)), 101)
 
     fig, ax = plt.subplots(figsize=(8.5, 4.2))
     for cond in ["N", "AS"]:
@@ -444,8 +514,8 @@ def section_plot_read_lengths_all(rl: pd.DataFrame, out_assets: Path, cohort: st
     ax.set_xlabel("Read length (bp)")
     ax.set_ylabel("Read count")
     ax.set_title(f"Filtered read length distribution across {cohort} cohort")
-    ax.set_xticks([100, 1000, 10000, 100000])
-    ax.set_xticklabels(["100", "1k", "10k", "100k"])
+    ax.set_xticks([1, 10, 100, 1000, 10000, 100000])
+    ax.set_xticklabels(["1", "10", "100", "1k", "10k", "100k"])
     ax.axvline(400, linestyle="--", color="#6b7280", linewidth=1.0)
     ax.legend(frameon=False)
     files.append(savefig(fig, out_assets / "section2_read_length_distribution.png"))
@@ -482,8 +552,8 @@ def section_plot_read_lengths_all(rl: pd.DataFrame, out_assets: Path, cohort: st
     for ax in axes:
         ax.set_xscale("log")
         ax.set_xlabel("Read length (bp)")
-        ax.set_xticks([100, 1000, 10000, 100000])
-        ax.set_xticklabels(["100", "1k", "10k", "100k"])
+        ax.set_xticks([1, 10, 100, 1000, 10000, 100000])
+        ax.set_xticklabels(["1", "10", "100", "1k", "10k", "100k"])
         ax.axvline(400, linestyle="--", color="#6b7280", linewidth=1.0)
         ax.legend(frameon=False)
         ax.spines["top"].set_visible(False)
@@ -522,7 +592,7 @@ def section_plot_read_lengths_by_method(
     fig, axes = plt.subplots(1, len(methods), figsize=(5.0 * max(len(methods), 1), 4.2), sharey=True)
     axes = np.atleast_1d(axes).ravel()
     max_len = int(rl["length"].max())
-    bins = np.logspace(np.log10(50), np.log10(max(max_len, 100000)), 101)
+    bins = np.logspace(0, np.log10(max(max_len, 100000)), 101)
 
     for ax, group_name in zip(axes, methods):
         sub = rl[rl["group"] == group_name]
@@ -540,8 +610,8 @@ def section_plot_read_lengths_by_method(
                 label=cond,
             )
         ax.set_xscale("log")
-        ax.set_xticks([100, 1000, 10000, 100000])
-        ax.set_xticklabels(["100", "1k", "10k", "100k"])
+        ax.set_xticks([1, 10, 100, 1000, 10000, 100000])
+        ax.set_xticklabels(["1", "10", "100", "1k", "10k", "100k"])
         ax.axvline(400, linestyle="--", color="#6b7280", linewidth=1.0)
         ax.set_xlabel("Read length (bp)")
         ax.set_title(group_labels.get(group_name, group_name))
@@ -564,7 +634,7 @@ def section_plot_method_comparison(
     methods = [g for g in group_order if g in set(rl["group"].dropna())]
     fig, axes = plt.subplots(1, 2, figsize=(12.8, 4.4), sharex=True, sharey=True)
     max_len = int(rl["length"].max())
-    bins = np.logspace(np.log10(50), np.log10(max(max_len, 100000)), 101)
+    bins = np.logspace(0, np.log10(max(max_len, 100000)), 101)
 
     for ax, cond in zip(axes, ["N", "AS"]):
         for group_name in methods:
@@ -581,8 +651,8 @@ def section_plot_method_comparison(
                 label=group_labels.get(group_name, group_name),
             )
         ax.set_xscale("log")
-        ax.set_xticks([100, 1000, 10000, 100000])
-        ax.set_xticklabels(["100", "1k", "10k", "100k"])
+        ax.set_xticks([1, 10, 100, 1000, 10000, 100000])
+        ax.set_xticklabels(["1", "10", "100", "1k", "10k", "100k"])
         ax.axvline(400, linestyle="--", color="#6b7280", linewidth=1.0)
         ax.set_xlabel("Read length (bp)")
         ax.set_title("Normal" if cond == "N" else "Adaptive Sampling")
@@ -596,12 +666,14 @@ def section_plot_method_comparison(
 
 def section_plot_read_lengths_per_barcode(rl: pd.DataFrame, listeria: pd.DataFrame, out_assets: Path, cohort: str) -> str:
     barcodes = sorted(listeria["barcode"].unique())
+    if not barcodes:
+        return ""
     ncols = 4
     nrows = int(math.ceil(len(barcodes) / ncols))
     fig, axes = plt.subplots(nrows, ncols, figsize=(15, 3.0 * nrows), sharex=True, sharey=True)
     axes = np.atleast_1d(axes).ravel()
     max_len = int(rl["length"].max())
-    bins = np.logspace(np.log10(50), np.log10(max(max_len, 100000)), 80)
+    bins = np.logspace(0, np.log10(max(max_len, 100000)), 80)
 
     label_map = (
         listeria.drop_duplicates("barcode")
@@ -627,8 +699,8 @@ def section_plot_read_lengths_per_barcode(rl: pd.DataFrame, listeria: pd.DataFra
         meta = label_map.get(barcode, {})
         ax.set_title(f"bc{barcode:02d} • {meta.get('group_label', '')}", fontsize=8)
         ax.set_xscale("log")
-        ax.set_xticks([100, 1000, 10000, 100000])
-        ax.set_xticklabels(["100", "1k", "10k", "100k"], fontsize=7)
+        ax.set_xticks([1, 10, 100, 1000, 10000, 100000])
+        ax.set_xticklabels(["1", "10", "100", "1k", "10k", "100k"], fontsize=7)
         ax.axvline(400, linestyle="--", color="#6b7280", linewidth=0.9)
         ax.tick_params(axis="y", labelsize=7)
     for ax in axes[len(barcodes):]:
@@ -921,6 +993,7 @@ def write_html(
     section7_taxa: pd.DataFrame,
     amr_reads_summary: pd.DataFrame,
     amr_contigs_summary: pd.DataFrame,
+    ctrl_listeria: pd.DataFrame | None = None,
 ) -> None:
     def imgs(files: Iterable[str]) -> str:
         return "".join(f"<img src='assets/{html.escape(f)}' alt='{html.escape(f)}'>" for f in files)
@@ -957,6 +1030,12 @@ def write_html(
     th {{ background: #f1f5f9; font-weight: 600; color: #475569; cursor: pointer; user-select: none; }}
     tr:hover {{ background: #f8fafc; }}
     .table-wrap {{ overflow-x: auto; }}
+    details {{ margin: 2rem 0; }}
+    details > summary {{ cursor: pointer; list-style: none; }}
+    details > summary::-webkit-details-marker {{ display: none; }}
+    details > summary > h2 {{ display: inline-block; position: relative; padding-left: 1.4rem; }}
+    details > summary > h2::before {{ content: "\\25B6"; position: absolute; left: 0; top: 50%; transform: translateY(-50%); font-size: 0.7em; color: #64748b; transition: transform 0.2s; }}
+    details[open] > summary > h2::before {{ transform: translateY(-50%) rotate(90deg); }}
     @media (max-width: 1100px) {{
       .summary-stats {{ justify-content: stretch; }}
       .stat-card {{ min-width: 45%; }}
@@ -988,60 +1067,61 @@ def write_html(
         <a href="#section-4">4. Listeria Detection</a>
         <a href="#section-6">6. Extraction Comparison</a>
         <a href="#section-7">7. Assembly and Contigs</a>
+        <a href="#section-ctrl">Controls</a>
       </div>
     </div>
 
-    <div class="section" id="section-1">
-      <h2>1. Sequencing Overview</h2>
+    <details open id="section-1">
+      <summary><h2>1. Sequencing Overview</h2></summary>
       <p class="note">This section is the fastest high-level summary of the cohort. It tells you how much filtered data is present overall and how much of it was assigned to <em>Listeria</em>.</p>
       <p class="note">Use this section first to judge scale before looking at per-barcode or per-method differences.</p>
       {df_to_html_table(general_metrics)}
-    </div>
+    </details>
 
-    <div class="section" id="section-2">
-      <h2>2. Cohort-Level Read Summary</h2>
+    <details open id="section-2">
+      <summary><h2>2. Cohort-Level Read Summary</h2></summary>
       <p class="note">All {cohort}-cohort barcodes are pooled here so the AS and N read-length profiles can be compared directly across the full cohort. The dashed line marks 400 bp.</p>
       <p class="note">If one condition has a visibly larger area under the curve, it contributed more reads in that length range. The summary table below gives the same comparison as cohort-level totals.</p>
       <div class="plot-grid">{imgs(section2_plots)}</div>
       <h3>Aggregated Summary</h3>
       {df_to_html_table(section2_summary)}
-    </div>
+    </details>
 
-    <div class="section" id="section-3">
-      <h2>3. Barcode-Level Read Metrics</h2>
+    <details open id="section-3">
+      <summary><h2>3. Barcode-Level Read Metrics</h2></summary>
       <p class="note">This section breaks the cohort back down to individual barcode pairs. Each panel compares the N and AS read-length profiles for one barcode only.</p>
       <p class="note">The table is useful if you want exact values rather than the visual distribution, especially for total bases, total reads, median read length, and read N50.</p>
       <div class="plot-grid"><img src="assets/{section3_plot}" alt="Per-barcode read length distributions"></div>
       <h3>Per-Sample Read Metrics</h3>
       {df_to_html_table(section3_table)}
-    </div>
+    </details>
 
-    <div class="section" id="section-3b">
-      <h2>3b. Read Lengths by Extraction Method</h2>
+    <details open id="section-3b">
+      <summary><h2>3b. Read Lengths by Extraction Method</h2></summary>
       <p class="note">Three method panels show Sponge / Mini, Cotton / Mini, and Zymo / Mini separately, each with N and AS overlaid on the same axes.</p>
       <p class="note">This view answers a different question than Section 3: instead of barcode-to-barcode variation, it shows whether one extraction method tends to produce a different read-length profile overall.</p>
       <div class="plot-grid"><img src="assets/{section3b_plot}" alt="Read lengths per method"></div>
-    </div>
+    </details>
 
-    <div class="section" id="section-3c">
-      <h2>3c. Method-Level Read Length Comparison</h2>
+    <details open id="section-3c">
+      <summary><h2>3c. Method-Level Read Length Comparison</h2></summary>
       <p class="note">Two pooled comparison panels split by sequencing mode. Within each panel, methods A, C, and D are overlaid directly.</p>
       <p class="note">Read this section left-to-right: first compare methods within Normal, then compare methods within Adaptive Sampling. This makes method effects easier to see without the AS/N overlay from Section 3b.</p>
       <div class="plot-grid"><img src="assets/{section3c_plot}" alt="Method comparison"></div>
-    </div>
+    </details>
 
-    <div class="section" id="section-4">
-      <h2>4. Listeria Detection Overview</h2>
+    <details open id="section-4">
+      <summary><h2>4. Listeria Detection Overview</h2></summary>
       <p class="note">Bars show each library as 100% of its total reads, with the Listeria-classified fraction highlighted.</p>
       <p class="note">This section is about enrichment visibility, not absolute sequencing yield. A small highlighted fraction means <em>Listeria</em> makes up only a small part of that sample even if the total library is large.</p>
       <p class="note">If you need the exact counts and percentages, use the sortable table directly below the figure.</p>
       <div class="plot-grid"><img src="assets/{section4_plot}" alt="Listeria overview"></div>
       <h3>Overview Table</h3>
       {df_to_html_table(section4_table)}
-    </div>
+    </details>
 
-    <div class="section" id="section-6">
-      <h2>6. Extraction Method Comparison</h2>
+    <details open id="section-6">
+      <summary><h2>6. Extraction Method Comparison</h2></summary>
       <p class="note">Direct comparison of the three {cohort}-cohort extraction methods: Sponge / Mini, Cotton / Mini, and Zymo / Mini.</p>
       <p class="note">This section collapses barcode-level noise and shows how the methods behave as groups. Use it to ask whether one extraction workflow systematically gives more total reads, more <em>Listeria</em> reads, or different AMR patterns.</p>
       <p class="note">The AMR tables keep barcode-level rows so you can see which sample each call came from, rather than only showing cohort-wide totals.</p>
@@ -1052,10 +1132,10 @@ def write_html(
       {df_to_html_table(amr_reads_summary)}
       <h3>AMR Summary in Contigs</h3>
       {df_to_html_table(amr_contigs_summary)}
-    </div>
+    </details>
 
-    <div class="section" id="section-7">
-      <h2>7. Assembly and Contig Analysis</h2>
+    <details open id="section-7">
+      <summary><h2>7. Assembly and Contig Analysis</h2></summary>
       <p class="note">This section shifts from reads to assemblies. The first figure compares Flye, MetaMDBG, and Myloasm directly for contig count, total assembled bases, N50, and median contig length.</p>
       <p class="note">The four assembly-metric panels use a log10 y-axis so differences between lower and higher values stay visible in the same figure. Zero-valued assemblies are omitted from those log-scale boxplots.</p>
       <p class="note">The taxa table below shows which organisms dominate the assembled contigs for each sample and assembler, which is useful for checking whether the assemblies are really centered on <em>Listeria</em> or still dominated by background organisms.</p>
@@ -1065,7 +1145,13 @@ def write_html(
       {df_to_html_table(section7_asm_summary)}
       <h3>Top Contig Taxa by Sample and Assembler</h3>
       {df_to_html_table(section7_taxa)}
-    </div>
+    </details>
+
+    <details open id="section-ctrl">
+      <summary><h2>Controls (Lm2 / Lm4 / Lm6)</h2></summary>
+      <p class="note">Positive control samples (Listeria monocytogenes strains spiked directly into extraction beads or swab solution) are shown separately from the experimental cohort.</p>
+      {df_to_html_table(ctrl_listeria) if ctrl_listeria is not None and not ctrl_listeria.empty else "<p class='note'>No control samples with sequencing data in this cohort/round.</p>"}
+    </details>
   </div>
   <script>
     function sortTable(th) {{
@@ -1144,6 +1230,9 @@ def main() -> int:
 
         for cohort in cohorts:
             data = prepare_cohort_tables(round_data, cohort)
+            if data["listeria"].empty:
+                print(f"WARNING: No listeria data for cohort '{cohort}'{f' round {int(rnd)}' if rnd is not None else ''}, skipping report.")
+                continue
             out_dir = base_dir / f"local_{data['cohort_slug']}_report{round_suffix}"
             assets_dir = out_dir / "assets"
             data_dir = out_dir / "data"
@@ -1183,6 +1272,18 @@ def main() -> int:
             s7_taxa.to_csv(data_dir / f"{prefix}_top_contig_taxa.csv", index=False)
             data["listeria"].to_csv(data_dir / f"{prefix}_listeria_overview_flat.csv", index=False)
 
+            # Export combined contig taxa with full metadata
+            combined_taxa = data["combined_taxa"]
+            if isinstance(combined_taxa, pd.DataFrame) and not combined_taxa.empty:
+                export_cols = [c for c in ["cohort", "cohort_group", "barcode", "condition", "sample", "contig_id", "length_bp", "taxon", "assembler"] if c in combined_taxa.columns]
+                combined_taxa[export_cols].to_csv(data_dir / f"{prefix}_combined_contig_taxa.csv", index=False)
+
+            # Export combined read taxa with full metadata
+            combined_read_taxa = data["combined_read_taxa"]
+            if isinstance(combined_read_taxa, pd.DataFrame) and not combined_read_taxa.empty:
+                read_export_cols = [c for c in ["cohort", "cohort_group", "barcode", "condition", "sample", "read_id", "length_bp", "taxon"] if c in combined_read_taxa.columns]
+                combined_read_taxa[read_export_cols].to_csv(data_dir / f"{prefix}_combined_read_taxa.csv", index=False)
+
             section4_table = data["listeria"].sort_values(["barcode", "condition"])[
                 [
                     "sample",
@@ -1214,6 +1315,13 @@ def main() -> int:
                 ]
             ].sort_values(["sample"])
 
+            # Prepare controls table for display
+            ctrl_listeria = data["ctrl_listeria"]
+            ctrl_display = None
+            if isinstance(ctrl_listeria, pd.DataFrame) and not ctrl_listeria.empty:
+                ctrl_cols = [c for c in ["sample", "sample_id", "group_label", "total_reads", "listeria_reads", "listeria_pct", "listeria_mean_len", "listeria_median_len"] if c in ctrl_listeria.columns]
+                ctrl_display = ctrl_listeria.sort_values(["barcode", "condition"])[ctrl_cols]
+
             write_html(
                 out_dir / "report.html",
                 cohort=cohort,
@@ -1233,6 +1341,7 @@ def main() -> int:
                 section7_taxa=s7_taxa,
                 amr_reads_summary=amr_reads_summary,
                 amr_contigs_summary=amr_contigs_summary,
+                ctrl_listeria=ctrl_display,
             )
 
             print(f"Report written to: {out_dir / 'report.html'}")
