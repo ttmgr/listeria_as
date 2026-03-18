@@ -184,6 +184,8 @@ def load_inputs(base_dir: Path) -> Dict[str, pd.DataFrame]:
     data: Dict[str, pd.DataFrame] = {}
 
     meta = pd.read_csv(base_dir / "sample_metadata.csv")
+    meta = meta.dropna(subset=["barcode"])
+    meta["barcode"] = meta["barcode"].astype(int)
     if "basename" in meta.columns:
         meta["sample"] = meta["basename"]
     else:
